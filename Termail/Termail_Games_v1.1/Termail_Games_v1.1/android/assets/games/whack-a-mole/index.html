@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>打地鼠</title>
+<style>
+  * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #15171c;
+    font-family: Arial, "Microsoft YaHei", sans-serif;
+    overflow: hidden;
+  }
+  body { display: flex; justify-content: center; align-items: center; padding: 6px; }
+
+  .game-container {
+    background: #1d2026;
+    border: 1px solid #333842;
+    padding: 8px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    width: 100%; height: 100%;
+    max-width: 460px;
+  }
+
+  .top-row { display: flex; gap: 6px; width: 100%; flex: 0 0 auto; }
+  .info-box {
+    flex: 1;
+    background: #14161a; border: 1px solid #333842;
+    padding: 4px 10px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .info-box .label { color: #6c7484; font-size: 12px; }
+  .info-box .value { color: #d8d8d8; font-size: 18px; font-weight: bold; }
+  .info-box .value.best { color: #f6d365; }
+  .info-box .value.time { color: #7ee0a0; }
+
+  .board-wrap {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+  }
+  canvas#board {
+    display: block;
+    background: #3a5a40;
+    border: 1px solid #333842;
+    border-radius: 4px;
+    touch-action: none;
+  }
+
+  .status {
+    text-align: center;
+    color: #b7c0d0;
+    font-size: 14px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    min-height: 20px;
+    flex: 0 0 auto;
+  }
+
+  .touch-controls { width: 100%; display: flex; gap: 5px; flex: 0 0 auto; }
+  .touch-btn {
+    flex: 1;
+    background: #262a32; border: 1px solid #3a404b; color: #cfd4dc;
+    border-radius: 4px; font-size: 14px; font-family: inherit;
+    padding: 11px 0; cursor: pointer;
+  }
+  .touch-btn:active { background: #313742; }
+
+  .hint {
+    text-align: center;
+    color: #6c7484;
+    font-size: 11px;
+    letter-spacing: 1px;
+    margin-top: 2px;
+  }
+
+  .overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.75);
+    display: flex; justify-content: center; align-items: center;
+    z-index: 10;
+  }
+  .overlay.hidden { display: none; }
+  .panel {
+    background: #1d2026; border: 1px solid #3a404b; border-radius: 8px;
+    padding: 22px 26px; min-width: 260px; max-width: 90%;
+    color: #cfd4dc; font-size: 14px; text-align: center;
+  }
+  .panel h3 { margin: 0 0 16px; font-size: 17px; color: #e0e0e0; font-weight: normal; letter-spacing: 2px; }
+  .panel .big { font-size: 32px; font-weight: bold; color: #7ee0a0; margin: 8px 0 4px; }
+  .panel .sub { color: #8a94a6; font-size: 13px; margin-bottom: 18px; }
+  .panel button {
+    width: 100%; padding: 11px 0; margin-top: 8px;
+    background: #262a32; border: 1px solid #3a404b;
+    color: #cfd4dc; border-radius: 4px; font-family: inherit; font-size: 14px; cursor: pointer;
+  }
+  .panel button.primary { background: #2b3a4a; border-color: #3a4f6b; color: #b8cbe8; }
+  .panel button:active { background: #313742; }
+</style>
+</head>
+<body>
+<div class="game-container">
+  <div class="top-row">
+    <div class="info-box">
+      <span class="label">分数</span>
+      <span class="value" id="scoreDisplay">0</span>
+    </div>
+    <div class="info-box">
+      <span class="label">最高</span>
+      <span class="value best" id="bestDisplay">0</span>
+    </div>
+    <div class="info-box">
+      <span class="label">时间</span>
+      <span class="value time" id="timeDisplay">30</span>
+    </div>
+  </div>
+
+  <div class="board-wrap">
+    <canvas id="board"></canvas>
+  </div>
+
+  <div class="status" id="statusText">点地鼠得分，别点炸弹</div>
+
+  <div class="touch-controls">
+    <button class="touch-btn" id="resetBtn">重新开始</button>
+  </div>
+</div>
+
+<div class="overlay hidden" id="overOverlay">
+  <div class="panel">
+    <h3>时间到！</h3>
+    <div class="big" id="finalScore">0</div>
+    <div class="sub" id="finalBest">最高 0</div>
+    <button class="primary" id="overRestart">再来一次</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  const canvas = document.getElementById('board');
+  const ctx = canvas.getContext('2d');
+  const wrap = canvas.parentElement;
+  const scoreDisplay = document.getElementById('scoreDisplay');
+  const bestDisplay = document.getElementById('bestDisplay');
+  const timeDisplay = document.getElementById('timeDisplay');
+  const statusText = document.getElementById('statusText');
+  const resetBtn = document.getElementById('resetBtn');
+  const overOverlay = document.getElementById('overOverlay');
+  const finalScore = document.getElementById('finalScore');
+  const finalBest = document.getElementById('finalBest');
+  const overRestart = document.getElementById('overRestart');
+
+  // 逻辑尺寸
+  const W = 400, H = 500;
+
+  // 3×3 洞
+  const COLS = 3, ROWS = 3;
+  let cellW = 0, cellH = 0;
+  let offsetX = 0, offsetY = 0;
+  const HOLE_R = 42;   // 洞的半径
+
+  // 游戏状态
+  let holes = [];       // {cx, cy, mole: null | {type, life, maxLife, hit}}
+  let score = 0, best = 0;
+  let timeLeft = 30;    // 秒
+  let gameEnd = false;
+  let lastSpawn = 0;
+  let spawnInterval = 700;   // 生成间隔 ms
+  let running = false;
+
+  let rafId = null;
+  let lastTime = 0;
+  let gameTimer = null;
+
+  // 命中效果
+  let effects = [];    // {x, y, text, color, life}
+
+  try { best = parseInt(localStorage.getItem('whack_best') || '0', 10); } catch(e) { best = 0; }
+  if (isNaN(best)) best = 0;
+
+  // ---------- 初始化 ----------
+  function initGame() {
+    cancelAnimationFrame(rafId);
+    if (gameTimer) { clearInterval(gameTimer); gameTimer = null; }
+
+    resizeCanvas();
+    layoutHoles();
+
+    score = 0;
+    timeLeft = 30;
+    gameEnd = false;
+    running = true;
+    lastSpawn = 0;
+    effects = [];
+
+    // 清空所有洞
+    for (const h of holes) h.mole = null;
+
+    overOverlay.classList.add('hidden');
+    updateUI();
+    draw();
+
+    lastTime = 0;
+    rafId = requestAnimationFrame(loop);
+
+    // 倒计时
+    gameTimer = setInterval(() => {
+      if (gameEnd) return;
+      timeLeft--;
+      if (timeLeft <= 0) {
+        timeLeft = 0;
+        gameOver();
+      }
+      updateUI();
+    }, 1000);
+  }
+
+  function layoutHoles() {
+    holes = [];
+    cellW = W / COLS;
+    cellH = H / ROWS;
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        holes.push({
+          cx: c * cellW + cellW / 2,
+          cy: r * cellH + cellH / 2 + 20,
+          mole: null
+        });
+      }
+    }
+  }
+
+  function resizeCanvas() {
+    const maxW = wrap.clientWidth;
+    const maxH = wrap.clientHeight;
+    const availW = maxW > 0 ? maxW : Math.min(window.innerWidth - 30, 440);
+    const availH = maxH > 0 ? maxH : Math.min(window.innerHeight - 240, 560);
+    const scale = Math.min(availW / W, availH / H);
+    const cw = Math.max(240, Math.floor(W * scale));
+    const ch = Math.max(300, Math.floor(H * scale));
+    if (canvas.width !== W || canvas.height !== H) {
+      canvas.width = W;
+      canvas.height = H;
+    }
+    canvas.style.width = cw + 'px';
+    canvas.style.height = ch + 'px';
+  }
+
+  function updateUI() {
+    scoreDisplay.textContent = score;
+    bestDisplay.textContent = best;
+    timeDisplay.textContent = timeLeft;
+  }
+
+  // ---------- 主循环 ----------
+  function loop(now) {
+    rafId = requestAnimationFrame(loop);
+    if (!lastTime) lastTime = now;
+    let dt = now - lastTime;
+    lastTime = now;
+    if (dt > 50) dt = 50;
+
+    if (running && !gameEnd) {
+      update(dt);
+    }
+    draw();
+  }
+
+  function update(dt) {
+    // 生成地鼠
+    lastSpawn += dt;
+    // 时间越少，生成越快
+    const speedUp = 1 + (30 - timeLeft) * 0.03;
+    const interval = spawnInterval / speedUp;
+
+    if (lastSpawn >= interval) {
+      lastSpawn = 0;
+      spawnMole();
+    }
+
+    // 更新地鼠
+    for (const h of holes) {
+      if (!h.mole) continue;
+      h.mole.life -= dt;
+      if (h.mole.life <= 0) {
+        // 地鼠跑了
+        if (h.mole.type === 'mole' && !h.mole.hit) {
+          // 没打到地鼠，不扣分（可以改成扣分）
+        }
+        h.mole = null;
+      }
+    }
+
+    // 命中效果
+    for (let i = effects.length - 1; i >= 0; i--) {
+      const e = effects[i];
+      e.y -= dt * 0.05;
+      e.life -= dt;
+      if (e.life <= 0) effects.splice(i, 1);
+    }
+  }
+
+  function spawnMole() {
+    // 找空着的洞
+    const empty = holes.filter(h => !h.mole);
+    if (empty.length === 0) return;
+
+    const h = empty[Math.floor(Math.random() * empty.length)];
+
+    // 20% 概率是炸弹
+    const isBomb = Math.random() < 0.2;
+
+    h.mole = {
+      type: isBomb ? 'bomb' : 'mole',
+      life: isBomb ? 900 : 1100,    // 存活时间
+      maxLife: isBomb ? 900 : 1100,
+      hit: false,
+      popProgress: 0   // 0~1，冒头动画
+    };
+  }
+
+  // ---------- 打地鼠 ----------
+  function whack(x, y) {
+    if (gameEnd || !running) return;
+
+    // 找点到的洞
+    for (const h of holes) {
+      if (!h.mole) continue;
+      const dx = x - h.cx;
+      const dy = y - h.cy;
+      if (dx * dx + dy * dy < HOLE_R * HOLE_R) {
+        const m = h.mole;
+        if (m.hit) return;
+
+        if (m.type === 'mole') {
+          m.hit = true;
+          score += 10;
+          effects.push({ x: h.cx, y: h.cy - 20, text: '+10', color: '#7ee0a0', life: 600 });
+        } else {
+          // 炸弹
+          m.hit = true;
+          score -= 15;
+          effects.push({ x: h.cx, y: h.cy - 20, text: '-15', color: '#ff6f61', life: 600 });
+        }
+        if (score < 0) score = 0;
+        if (score > best) {
+          best = score;
+          try { localStorage.setItem('whack_best', String(best)); } catch(e) {}
+        }
+        h.mole = null;
+        updateUI();
+        return;
+      }
+    }
+  }
+
+  function gameOver() {
+    gameEnd = true;
+    running = false;
+    if (gameTimer) { clearInterval(gameTimer); gameTimer = null; }
+    if (score > best) {
+      best = score;
+      try { localStorage.setItem('whack_best', String(best)); } catch(e) {}
+    }
+    updateUI();
+    finalScore.textContent = score;
+    finalBest.textContent = '最高 ' + best;
+    overOverlay.classList.remove('hidden');
+  }
+
+  // ---------- 绘制 ----------
+  function draw() {
+    const cw = canvas.width, ch = canvas.height;
+    if (cw === 0 || ch === 0) return;
+
+    // 草地背景
+    const g = ctx.createLinearGradient(0, 0, 0, ch);
+    g.addColorStop(0, '#4a6b50');
+    g.addColorStop(1, '#3a5a40');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, cw, ch);
+
+    // 草地纹理
+    ctx.fillStyle = 'rgba(0,0,0,.06)';
+    for (let y = 0; y < ch; y += 24) {
+      for (let x = (y % 48 === 0 ? 0 : 12); x < cw; x += 24) {
+        ctx.fillRect(x, y, 2, 2);
+      }
+    }
+
+    // 画洞（每帧根据地鼠画）
+    for (const h of holes) {
+      drawHole(h);
+    }
+
+    // 命中效果
+    for (const e of effects) {
+      ctx.globalAlpha = Math.min(1, e.life / 400);
+      ctx.fillStyle = e.color;
+      ctx.font = 'bold 22px Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(e.text, e.x, e.y);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function drawHole(h) {
+    // 洞：深色椭圆
+    ctx.beginPath();
+    ctx.ellipse(h.cx, h.cy + 10, HOLE_R, HOLE_R * 0.5, 0, 0, Math.PI * 2);
+    ctx.fillStyle = '#2a3e2d';
+    ctx.fill();
+    ctx.strokeStyle = '#1d2b1f';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // 如果地鼠在，画地鼠
+    if (h.mole) {
+      // 冒头动画（0~1）
+      const p = h.mole.life / h.mole.maxLife;   // 1 -> 0
+      const popP = Math.min(1, (1 - p) * 3);    // 快速冒头
+      const disappear = p < 0.3 ? p / 0.3 : 1;  // 快消失时缩回
+
+      const rise = popP * disappear;   // 0~1 上升比例
+      const moleY = h.cy - rise * 40;
+
+      // 被击中：快速缩回
+      let shrink = 1;
+      if (h.mole.hit) shrink = 0.3;
+
+      ctx.save();
+      ctx.translate(h.cx, moleY);
+
+      // 缩放（缩回）
+      ctx.scale(shrink, shrink * rise);
+
+      if (h.mole.type === 'mole') {
+        drawMole(0, 0);
+      } else {
+        drawBomb(0, 0);
+      }
+
+      ctx.restore();
+    }
+  }
+
+  function drawMole(x, y) {
+    // 地鼠：棕色圆 + 耳朵 + 眼睛 + 鼻子
+    // 身体
+    ctx.beginPath();
+    ctx.arc(x, y, 28, 0, Math.PI * 2);
+    ctx.fillStyle = '#a0703c';
+    ctx.fill();
+    ctx.strokeStyle = '#6a4824';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // 耳朵
+    ctx.fillStyle = '#a0703c';
+    ctx.beginPath();
+    ctx.arc(x - 22, y - 22, 8, 0, Math.PI * 2);
+    ctx.arc(x + 22, y - 22, 8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // 脸（浅色）
+    ctx.beginPath();
+    ctx.ellipse(x, y + 6, 20, 16, 0, 0, Math.PI * 2);
+    ctx.fillStyle = '#d4a870';
+    ctx.fill();
+
+    // 眼睛
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(x - 9, y - 6, 6, 0, Math.PI * 2);
+    ctx.arc(x + 9, y - 6, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#1d2026';
+    ctx.beginPath();
+    ctx.arc(x - 9, y - 6, 3, 0, Math.PI * 2);
+    ctx.arc(x + 9, y - 6, 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 鼻子
+    ctx.fillStyle = '#6a4824';
+    ctx.beginPath();
+    ctx.arc(x, y + 6, 5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 嘴巴
+    ctx.strokeStyle = '#6a4824';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(x - 5, y + 14, 5, 0.2, Math.PI - 0.2);
+    ctx.arc(x + 5, y + 14, 5, 0.2, Math.PI - 0.2);
+    ctx.stroke();
+  }
+
+  function drawBomb(x, y) {
+    // 炸弹：黑圆 + 引线 + 火花
+    ctx.beginPath();
+    ctx.arc(x, y, 26, 0, Math.PI * 2);
+    ctx.fillStyle = '#2a2f3a';
+    ctx.fill();
+    ctx.strokeStyle = '#11141a';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // 高光
+    ctx.beginPath();
+    ctx.arc(x - 8, y - 8, 8, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,.25)';
+    ctx.fill();
+
+    // 引线
+    ctx.strokeStyle = '#8a6b45';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(x + 8, y - 22);
+    ctx.quadraticCurveTo(x + 20, y - 34, x + 16, y - 40);
+    ctx.stroke();
+
+    // 火花
+    ctx.fillStyle = '#ffd966';
+    ctx.beginPath();
+    ctx.arc(x + 16, y - 40, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ff6f61';
+    ctx.beginPath();
+    ctx.arc(x + 16, y - 40, 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ---------- 输入 ----------
+  let touchUsed = false;
+
+  function handleTap(e) {
+    if (gameEnd) return;
+    const rect = canvas.getBoundingClientRect();
+    let clientX, clientY;
+    if (e.changedTouches && e.changedTouches.length) {
+      clientX = e.changedTouches[0].clientX;
+      clientY = e.changedTouches[0].clientY;
+    } else if (e.touches && e.touches.length) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+    const x = (clientX - rect.left) / rect.width * canvas.width;
+    const y = (clientY - rect.top) / rect.height * canvas.height;
+    whack(x, y);
+  }
+
+  canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    touchUsed = true;
+    handleTap(e);
+  }, { passive: false });
+
+  canvas.addEventListener('mousedown', (e) => {
+    if (touchUsed) return;
+    handleTap(e);
+  });
+  canvas.addEventListener('mouseup', () => { touchUsed = false; });
+
+  resetBtn.addEventListener('click', initGame);
+  resetBtn.addEventListener('touchstart', (e) => { e.preventDefault(); initGame(); }, { passive: false });
+
+  overRestart.addEventListener('click', initGame);
+  overRestart.addEventListener('touchstart', (e) => { e.preventDefault(); initGame(); }, { passive: false });
+
+  window.addEventListener('resize', () => { resizeCanvas(); layoutHoles(); draw(); });
+  window.addEventListener('orientationchange', () => { setTimeout(() => { resizeCanvas(); layoutHoles(); draw(); }, 200); });
+
+  initGame();
+})();
+</script>
+</body>
+</html>

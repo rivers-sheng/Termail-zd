@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>24 点</title>
+<style>
+  * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #15171c;
+    font-family: Arial, "Microsoft YaHei", sans-serif;
+    overflow: hidden;
+  }
+  body { display: flex; justify-content: center; align-items: center; padding: 6px; }
+
+  .game-container {
+    background: #1d2026;
+    border: 1px solid #333842;
+    padding: 8px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    width: 100%; height: 100%;
+    max-width: 460px;
+  }
+
+  .top-row { display: flex; gap: 6px; width: 100%; flex: 0 0 auto; }
+  .info-box {
+    flex: 1;
+    background: #14161a; border: 1px solid #333842;
+    padding: 4px 10px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .info-box .label { color: #6c7484; font-size: 12px; }
+  .info-box .value { color: #d8d8d8; font-size: 18px; font-weight: bold; }
+  .info-box .value.win { color: #7ee0a0; }
+  .info-box .value.lose { color: #ff6f61; }
+
+  /* 卡牌区 */
+  .cards {
+    flex: 0 0 auto;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    padding: 6px 0;
+  }
+  .card {
+    flex: 1;
+    max-width: 80px;
+    aspect-ratio: 3 / 4;
+    background: #1a1e26;
+    border: 2px solid #3a404b;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    font-weight: bold;
+    color: #d8d8d8;
+    cursor: pointer;
+    position: relative;
+    transition: 0.12s ease;
+  }
+  .card.used {
+    opacity: 0.3;
+    border-style: dashed;
+  }
+  .card.selected {
+    border-color: #5d9df9;
+    background: #20303f;
+    box-shadow: 0 0 0 2px #5d9df9 inset;
+  }
+
+  /* 表达式显示 */
+  .expr-box {
+    width: 100%;
+    min-height: 56px;
+    background: #14161a;
+    border: 1px solid #333842;
+    border-radius: 6px;
+    padding: 8px 12px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    flex: 0 0 auto;
+  }
+  .expr-box .placeholder {
+    color: #565e6d;
+    font-size: 14px;
+  }
+  .token {
+    font-size: 18px;
+    font-weight: bold;
+    color: #cfd4dc;
+    padding: 2px 6px;
+  }
+  .token.num { color: #d8d8d8; }
+  .token.op { color: #f6d365; }
+  .token.paren { color: #7ee0a0; }
+
+  /* 操作符按钮 */
+  .ops {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 5px;
+    width: 100%;
+    flex: 0 0 auto;
+  }
+  .op-btn {
+    background: #262a32; border: 1px solid #3a404b; color: #cfd4dc;
+    border-radius: 4px; font-size: 20px; font-family: inherit;
+    padding: 13px 0; cursor: pointer;
+  }
+  .op-btn:active { background: #313742; }
+  .op-btn.active { background: #3a4f6b; border-color: #5a7aa0; color: #d8e6ff; }
+
+  .touch-controls { width: 100%; display: flex; flex-direction: column; gap: 5px; flex: 0 0 auto; }
+  .control-row { display: flex; gap: 5px; }
+  .touch-btn {
+    flex: 1;
+    background: #262a32; border: 1px solid #3a404b; color: #cfd4dc;
+    border-radius: 4px; font-size: 14px; font-family: inherit;
+    padding: 11px 0; cursor: pointer;
+  }
+  .touch-btn:active { background: #313742; }
+  .touch-btn.small { font-size: 12px; }
+  .touch-btn.primary { background: #2b3a4a; border-color: #3a4f6b; color: #b8cbe8; }
+
+  .hint {
+    text-align: center;
+    color: #6c7484;
+    font-size: 11px;
+    letter-spacing: 1px;
+    margin-top: 2px;
+  }
+
+  .overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.75);
+    display: flex; justify-content: center; align-items: center;
+    z-index: 10;
+  }
+  .overlay.hidden { display: none; }
+  .panel {
+    background: #1d2026; border: 1px solid #3a404b; border-radius: 8px;
+    padding: 20px 24px; min-width: 260px; max-width: 90%;
+    color: #cfd4dc; font-size: 14px;
+    text-align: center;
+  }
+  .panel h3 { margin: 0 0 16px; font-size: 16px; color: #e0e0e0; font-weight: normal; letter-spacing: 2px; }
+  .panel .solution {
+    font-size: 20px; font-weight: bold; color: #f6d365;
+    margin: 12px 0 20px;
+    word-break: break-all;
+  }
+  .panel .msg { font-size: 15px; margin: 12px 0 20px; color: #b7c0d0; }
+  .panel button {
+    width: 100%; padding: 11px 0; margin-top: 8px;
+    background: #262a32; border: 1px solid #3a404b;
+    color: #cfd4dc; border-radius: 4px; font-family: inherit; font-size: 14px; cursor: pointer;
+  }
+  .panel button.primary { background: #2b3a4a; border-color: #3a4f6b; color: #b8cbe8; }
+  .panel button:active { background: #313742; }
+</style>
+</head>
+<body>
+<div class="game-container">
+  <div class="top-row">
+    <div class="info-box">
+      <span class="label">分数</span>
+      <span class="value win" id="scoreDisplay">0</span>
+    </div>
+    <div class="info-box">
+      <span class="label">题号</span>
+      <span class="value" id="roundDisplay">1</span>
+    </div>
+  </div>
+
+  <div class="cards" id="cardsArea">
+    <!-- 4 张牌动态生成 -->
+  </div>
+
+  <div class="expr-box" id="exprBox">
+    <span class="placeholder">点牌和符号，拼出 24 的算式</span>
+  </div>
+
+  <div class="ops">
+    <button class="op-btn" data-op="+">+</button>
+    <button class="op-btn" data-op="-">−</button>
+    <button class="op-btn" data-op="×">×</button>
+    <button class="op-btn" data-op="÷">÷</button>
+  </div>
+  <div class="ops" style="grid-template-columns: repeat(3, 1fr);">
+    <button class="op-btn" data-op="(">(</button>
+    <button class="op-btn" data-op=")">)</button>
+    <button class="op-btn" data-op="clear">清空</button>
+  </div>
+
+  <div class="touch-controls">
+    <div class="control-row">
+      <button class="touch-btn" id="backBtn">删一个</button>
+      <button class="touch-btn primary" id="submitBtn">提交答案</button>
+      <button class="touch-btn small" id="hintBtn">提示</button>
+      <button class="touch-btn small" id="newBtn">换一题</button>
+    </div>
+    <div class="hint">每张牌用且只用一次，凑出 24</div>
+  </div>
+</div>
+
+<!-- 结果/提示弹窗 -->
+<div class="overlay hidden" id="resultOverlay">
+  <div class="panel">
+    <h3 id="resultTitle">结果</h3>
+    <div class="msg" id="resultMsg"></div>
+    <button class="primary" id="resultOk">好的</button>
+  </div>
+</div>
+
+<!-- 提示弹窗 -->
+<div class="overlay hidden" id="hintOverlay">
+  <div class="panel">
+    <h3>参考解法</h3>
+    <div class="solution" id="hintSolution"></div>
+    <button class="primary" id="hintOk">知道了</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  const cardsArea = document.getElementById('cardsArea');
+  const exprBox = document.getElementById('exprBox');
+  const scoreDisplay = document.getElementById('scoreDisplay');
+  const roundDisplay = document.getElementById('roundDisplay');
+  const backBtn = document.getElementById('backBtn');
+  const submitBtn = document.getElementById('submitBtn');
+  const hintBtn = document.getElementById('hintBtn');
+  const newBtn = document.getElementById('newBtn');
+  const resultOverlay = document.getElementById('resultOverlay');
+  const resultTitle = document.getElementById('resultTitle');
+  const resultMsg = document.getElementById('resultMsg');
+  const resultOk = document.getElementById('resultOk');
+  const hintOverlay = document.getElementById('hintOverlay');
+  const hintSolution = document.getElementById('hintSolution');
+  const hintOk = document.getElementById('hintOk');
+
+  let numbers = [];        // 4 个数字
+  let tokens = [];         // 当前表达式 token 序列
+  let cardsUsed = [];      // 每张牌是否已用
+  let selectedCard = -1;   // 当前选中牌（用于替换占位）
+  let score = 0;
+  let round = 1;
+  let currentSolution = null;
+
+  // ---------- 出题 ----------
+  // 生成一道保证有解的 24 点题
+  function newPuzzle() {
+    let nums, sol;
+    let attempts = 0;
+    do {
+      nums = [];
+      for (let i = 0; i < 4; i++) nums.push(1 + Math.floor(Math.random() * 13)); // 1~13
+      sol = solve24(nums);
+      attempts++;
+    } while (!sol && attempts < 200);
+
+    // 保底：如果实在随机不到（几乎不会），用一组经典有解的数
+    if (!sol) {
+      nums = [4, 6, 6, 8];
+      sol = solve24(nums);
+    }
+
+    numbers = nums;
+    currentSolution = sol;
+    tokens = [];
+    cardsUsed = [0, 0, 0, 0];
+    selectedCard = -1;
+
+    renderCards();
+    renderExpr();
+  }
+
+  // ---------- 求解器 ----------
+  // 返回一个解法字符串，或 null
+  function solve24(nums) {
+    const ops = ['+', '-', '*', '/'];
+    // 用分数/浮点运算，避免精度问题用 epsilon
+    function dfs(list, exprList) {
+      if (list.length === 1) {
+        if (Math.abs(list[0] - 24) < 1e-6) {
+          return exprList[0];
+        }
+        return null;
+      }
+      // 选两个数组合
+      for (let i = 0; i < list.length; i++) {
+        for (let j = 0; j < list.length; j++) {
+          if (i === j) continue;
+          const rest = [];
+          for (let k = 0; k < list.length; k++) if (k !== i && k !== j) rest.push(list[k]);
+          const restExpr = [];
+          for (let k = 0; k < list.length; k++) if (k !== i && k !== j) restExpr.push(exprList[k]);
+          const a = list[i], b = list[j];
+          const ea = exprList[i], eb = exprList[j];
+
+          // 枚举四种运算（加、乘有交换律，去重减一半计算量）
+          const candidates = [
+            { v: a + b, e: '(' + ea + '+' + eb + ')' },
+            { v: a * b, e: '(' + ea + '×' + eb + ')' },
+            { v: a - b, e: '(' + ea + '−' + eb + ')' },
+            { v: b - a, e: '(' + eb + '−' + ea + ')' },
+          ];
+          if (Math.abs(b) > 1e-9) candidates.push({ v: a / b, e: '(' + ea + '÷' + eb + ')' });
+          if (Math.abs(a) > 1e-9) candidates.push({ v: b / a, e: '(' + eb + '÷' + ea + ')' });
+
+          for (const cand of candidates) {
+            const newList = rest.concat([cand.v]);
+            const newExpr = restExpr.concat([cand.e]);
+            const r = dfs(newList, newExpr);
+            if (r) return r;
+          }
+        }
+      }
+      return null;
+    }
+
+    const res = dfs(nums.slice(), nums.map(String));
+    if (!res) return null;
+    // 去掉最外层多余括号
+    let s = res;
+    if (s.startsWith('(') && s.endsWith(')')) s = s.slice(1, -1);
+    return s;
+  }
+
+  // ---------- 渲染卡牌 ----------
+  function renderCards() {
+    cardsArea.innerHTML = '';
+    for (let i = 0; i < 4; i++) {
+      const el = document.createElement('div');
+      el.className = 'card' + (cardsUsed[i] ? ' used' : '') + (selectedCard === i ? ' selected' : '');
+      el.textContent = numbers[i];
+      el.dataset.idx = i;
+      el.addEventListener('click', () => onCardClick(i));
+      el.addEventListener('touchstart', (e) => { e.preventDefault(); onCardClick(i); }, { passive: false });
+      cardsArea.appendChild(el);
+    }
+  }
+
+  function onCardClick(i) {
+    if (cardsUsed[i]) return;   // 已用的牌不能再点
+    // 把这张牌的数字作为一个 token 加入表达式
+    tokens.push({ type: 'num', value: numbers[i], cardIdx: i });
+    cardsUsed[i] = 1;
+    renderCards();
+    renderExpr();
+  }
+
+  // ---------- 渲染表达式 ----------
+  function renderExpr() {
+    if (tokens.length === 0) {
+      exprBox.innerHTML = '<span class="placeholder">点牌和符号，拼出 24 的算式</span>';
+      return;
+    }
+    exprBox.innerHTML = '';
+    for (let i = 0; i < tokens.length; i++) {
+      const t = tokens[i];
+      const span = document.createElement('span');
+      span.className = 'token ' + (t.type === 'num' ? 'num' : t.type === 'paren' ? 'paren' : 'op');
+      span.textContent = t.type === 'num' ? t.value : t.value;
+      exprBox.appendChild(span);
+    }
+  }
+
+  // 加操作符
+  document.querySelectorAll('.op-btn').forEach(btn => {
+    const handler = (e) => {
+      e.preventDefault();
+      const op = btn.dataset.op;
+      if (op === 'clear') {
+        tokens = [];
+        cardsUsed = [0,0,0,0];
+        renderCards();
+        renderExpr();
+        return;
+      }
+      tokens.push({ type: op === '(' || op === ')' ? 'paren' : 'op', value: op });
+      renderExpr();
+    };
+    btn.addEventListener('click', handler);
+    btn.addEventListener('touchstart', handler, { passive: false });
+  });
+
+  // ---------- 删一个 / 清空 ----------
+  function backspace() {
+    if (tokens.length === 0) return;
+    const last = tokens.pop();
+    if (last.type === 'num') {
+      cardsUsed[last.cardIdx] = 0;
+    }
+    renderCards();
+    renderExpr();
+  }
+  backBtn.addEventListener('click', backspace);
+  backBtn.addEventListener('touchstart', (e) => { e.preventDefault(); backspace(); }, { passive: false });
+
+  // ---------- 提交 ----------
+  function submit() {
+    // 检查四张牌都用了吗
+    if (cardsUsed.some(u => u === 0)) {
+      showResult('还没用完牌', '每张牌都必须用且只用一次。');
+      return;
+    }
+    // 把 token 拼成可计算表达式
+    const exprStr = tokens.map(t => t.value).join('');
+    // 转成 JS 可计算的式子
+    let jsExpr = exprStr.replace(/×/g, '*').replace(/÷/g, '/').replace(/−/g, '-');
+    let result;
+    try {
+      // 安全起见只允许数字和运算符
+      if (!/^[\d+\-*/().\s]+$/.test(jsExpr)) throw new Error('bad');
+      result = Function('"use strict"; return (' + jsExpr + ')')();
+    } catch (e) {
+      showResult('式子有问题', '算式写得不太对，检查一下括号和运算符。');
+      return;
+    }
+    if (typeof result !== 'number' || !isFinite(result)) {
+      showResult('式子有问题', '算式算不出有效结果。');
+      return;
+    }
+
+    if (Math.abs(result - 24) < 1e-6) {
+      score += 10;
+      scoreDisplay.textContent = score;
+      showResult('答对了！', exprStr + ' = 24', true);
+    } else {
+      showResult('还差一点', exprStr + ' = ' + (Math.round(result * 1000) / 1000), false);
+    }
+  }
+  submitBtn.addEventListener('click', submit);
+  submitBtn.addEventListener('touchstart', (e) => { e.preventDefault(); submit(); }, { passive: false });
+
+  function showResult(title, msg, success) {
+    resultTitle.textContent = title;
+    resultTitle.style.color = success ? '#7ee0a0' : '#ff9a8a';
+    resultMsg.textContent = msg;
+    resultOverlay.classList.remove('hidden');
+  }
+  resultOk.addEventListener('click', () => {
+    resultOverlay.classList.add('hidden');
+  });
+  resultOk.addEventListener('touchstart', (e) => { e.preventDefault(); resultOverlay.classList.add('hidden'); }, { passive: false });
+
+  // ---------- 提示 ----------
+  function showHint() {
+    if (!currentSolution) {
+      showResult('提示', '这道题没找到解法（极少见），换一题吧。');
+      return;
+    }
+    hintSolution.textContent = currentSolution + ' = 24';
+    hintOverlay.classList.remove('hidden');
+  }
+  hintBtn.addEventListener('click', showHint);
+  hintBtn.addEventListener('touchstart', (e) => { e.preventDefault(); showHint(); }, { passive: false });
+  hintOk.addEventListener('click', () => hintOverlay.classList.add('hidden'));
+  hintOk.addEventListener('touchstart', (e) => { e.preventDefault(); hintOverlay.classList.add('hidden'); }, { passive: false });
+
+  // ---------- 换一题 ----------
+  function nextRound() {
+    round++;
+    roundDisplay.textContent = round;
+    newPuzzle();
+  }
+  newBtn.addEventListener('click', nextRound);
+  newBtn.addEventListener('touchstart', (e) => { e.preventDefault(); nextRound(); }, { passive: false });
+
+  // 答对后自动换题的按钮里也调用 nextRound（在 resultOk 里加个判断）
+  resultOk.addEventListener('click', () => {
+    if (resultTitle.textContent === '答对了！') nextRound();
+  });
+
+  // 启动
+  newPuzzle();
+})();
+</script>
+</body>
+</html>

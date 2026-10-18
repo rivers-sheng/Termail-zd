@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>一笔画</title>
+<style>
+  * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #15171c;
+    font-family: Arial, "Microsoft YaHei", sans-serif;
+    overflow: hidden;
+  }
+  body { display: flex; justify-content: center; align-items: center; padding: 6px; }
+
+  .game-container {
+    background: #1d2026;
+    border: 1px solid #333842;
+    padding: 8px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    width: 100%; height: 100%;
+    max-width: 460px;
+  }
+
+  .top-row { display: flex; gap: 6px; width: 100%; flex: 0 0 auto; }
+  .info-box {
+    flex: 1;
+    background: #14161a; border: 1px solid #333842;
+    padding: 4px 10px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .info-box .label { color: #6c7484; font-size: 12px; }
+  .info-box .value { color: #d8d8d8; font-size: 18px; font-weight: bold; }
+
+  .board-wrap {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+  }
+  canvas#board {
+    display: block;
+    background: #0d0f12;
+    border: 1px solid #333842;
+    touch-action: none;
+  }
+
+  .touch-controls { width: 100%; display: flex; flex-direction: column; gap: 5px; flex: 0 0 auto; }
+  .control-row { display: flex; gap: 5px; }
+  .touch-btn {
+    flex: 1;
+    background: #262a32; border: 1px solid #3a404b; color: #cfd4dc;
+    border-radius: 4px; font-size: 14px; font-family: inherit;
+    padding: 11px 0; cursor: pointer;
+  }
+  .touch-btn:active { background: #313742; }
+  .touch-btn.small { font-size: 12px; }
+  .touch-btn.active { background: #3a4f6b; border-color: #5a7aa0; color: #d8e6ff; }
+
+  .hint {
+    text-align: center;
+    color: #6c7484;
+    font-size: 11px;
+    letter-spacing: 1px;
+    margin-top: 2px;
+  }
+
+  .overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.7);
+    display: flex; justify-content: center; align-items: center;
+    z-index: 10;
+  }
+  .overlay.hidden { display: none; }
+  .panel {
+    background: #1d2026; border: 1px solid #3a404b; border-radius: 8px;
+    padding: 20px 24px; min-width: 250px; max-width: 90%;
+    color: #cfd4dc; font-size: 14px;
+  }
+  .panel h3 { margin: 0 0 16px; font-size: 16px; color: #e0e0e0; text-align: center; font-weight: normal; letter-spacing: 2px; }
+  .level-btn {
+    display: block; width: 100%; margin-bottom: 8px;
+    background: #262a32; border: 1px solid #3a404b; color: #cfd4dc;
+    border-radius: 4px; padding: 11px 0; font-family: inherit; font-size: 14px; cursor: pointer;
+  }
+  .level-btn.active { background: #3a4f6b; border-color: #5a7aa0; color: #d8e6ff; }
+  .level-btn:active { background: #313742; }
+  .panel .close { margin-top: 12px; }
+</style>
+</head>
+<body>
+<div class="game-container">
+  <div class="top-row">
+    <div class="info-box">
+      <span class="label">关卡</span>
+      <span class="value" id="levelDisplay">1</span>
+    </div>
+    <div class="info-box">
+      <span class="label">进度</span>
+      <span class="value" id="progressDisplay">0/0</span>
+    </div>
+    <div class="info-box">
+      <span class="label">尺寸</span>
+      <span class="value" id="sizeDisplay" style="font-size:14px;">3×3</span>
+    </div>
+  </div>
+
+  <div class="board-wrap">
+    <canvas id="board"></canvas>
+  </div>
+
+  <div class="touch-controls">
+    <div class="control-row">
+      <button class="touch-btn" id="undoBtn">撤销一步</button>
+      <button class="touch-btn small" id="restartBtn">重走</button>
+      <button class="touch-btn small" id="sizeBtn">选尺寸</button>
+      <button class="touch-btn small" id="nextBtn">下一关</button>
+    </div>
+    <div class="hint">从任一节点开始，不抬笔走完所有边</div>
+  </div>
+</div>
+
+<div class="overlay hidden" id="sizeOverlay">
+  <div class="panel">
+    <h3>选择尺寸</h3>
+    <button class="level-btn" data-size="3">3 × 3 · 简单</button>
+    <button class="level-btn" data-size="4">4 × 4 · 中等</button>
+    <button class="level-btn" data-size="5">5 × 5 · 困难</button>
+    <button class="level-btn close" id="sizeClose">取消</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  const boardCanvas = document.getElementById('board');
+  const ctx = boardCanvas.getContext('2d');
+  const wrap = boardCanvas.parentElement;
+  const levelDisplay = document.getElementById('levelDisplay');
+  const progressDisplay = document.getElementById('progressDisplay');
+  const sizeDisplay = document.getElementById('sizeDisplay');
+  const undoBtn = document.getElementById('undoBtn');
+  const restartBtn = document.getElementById('restartBtn');
+  const sizeBtn = document.getElementById('sizeBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  const sizeOverlay = document.getElementById('sizeOverlay');
+  const sizeClose = document.getElementById('sizeClose');
+
+  let N = 3;                     // 节点网格 N×N
+  let nodes = [];                // {x, y, r, c} 逻辑节点
+  let edges = [];                // {a, b, used} 索引
+  let adj = [];                  // 邻接表
+  let drawnEdges = [];           // 已走过的边（按顺序）
+  let current = -1;              // 当前所在节点
+  let pathNodes = [];            // 走过的节点序列
+  let won = false;
+  let cellSize = 60;
+
+  // 画布留边
+  const MARGIN = 40;
+
+  // ---------- 生成关卡 ----------
+  // 用生成树 + 校验欧拉路径的方式，保证一笔画可解
+  function generateLevel() {
+    const total = N * N;
+    // 节点坐标
+    nodes = [];
+    for (let r = 0; r < N; r++) {
+      for (let c = 0; c < N; c++) {
+        nodes.push({ r, c });
+      }
+    }
+    // 所有可能的边（相邻格之间）
+    const allEdges = [];
+    function idx(r, c) { return r * N + c; }
+    for (let r = 0; r < N; r++) {
+      for (let c = 0; c < N; c++) {
+        if (c < N - 1) allEdges.push([idx(r, c), idx(r, c+1)]);
+        if (r < N - 1) allEdges.push([idx(r, c), idx(r+1, c)]);
+      }
+    }
+
+    // 随机选取一个连通、且奇度节点为 0 或 2 个的边集
+    // 做法：随机生成一棵生成树保证连通，再加入若干额外边，直到满足欧拉条件
+    let attempt = 0;
+    let chosen;
+    while (attempt < 300) {
+      attempt++;
+      chosen = randomEulerianEdgeSet(allEdges, total);
+      if (chosen) break;
+    }
+    if (!chosen) {
+      // 保底：用生成树（树天然欧拉路径可走？树不一定，但最小连通树只有 2 个奇度点或0个）
+      chosen = spanningTree(allEdges, total);
+    }
+
+    edges = chosen.map(([a, b]) => ({ a, b, used: false }));
+    // 构建邻接
+    adj = Array.from({length: total}, () => []);
+    edges.forEach((e, i) => {
+      adj[e.a].push({ to: e.b, edge: i });
+      adj[e.b].push({ to: e.a, edge: i });
+    });
+
+    drawnEdges = [];
+    pathNodes = [];
+    current = -1;
+    won = false;
+    updateUI();
+    computeCellSize();
+    draw();
+    requestAnimationFrame(() => { computeCellSize(); draw(); });
+  }
+
+  // 生成树（Prim 随机）
+  function spanningTree(allEdges, total) {
+    const visited = Array(total).fill(false);
+    const treeEdges = [];
+    const start = Math.floor(Math.random() * total);
+    visited[start] = true;
+    const frontier = allEdges.filter(([a, b]) => a === start || b === start);
+    let count = 1;
+    while (count < total && frontier.length > 0) {
+      const i = Math.floor(Math.random() * frontier.length);
+      const [a, b] = frontier.splice(i, 1)[0];
+      const newNode = visited[a] ? b : a;
+      if (visited[a] && visited[b]) continue;
+      visited[newNode] = true;
+      treeEdges.push([a, b]);
+      count++;
+      // 加入新节点连出的边
+      for (const [x, y] of allEdges) {
+        if ((x === newNode && !visited[y]) || (y === newNode && !visited[x])) {
+          frontier.push([x, y]);
+        }
+      }
+    }
+    return treeEdges;
+  }
+
+  // 随机选边集，使所有节点连通且奇度点数为 0 或 2
+  function randomEulerianEdgeSet(allEdges, total) {
+    // 先建生成树保证连通
+    const tree = spanningTree(allEdges, total);
+    const edgeSet = new Set(tree.map(([a,b]) => a < b ? a+'-'+b : b+'-'+a));
+    const extraPool = allEdges.filter(([a,b]) => !edgeSet.has(a < b ? a+'-'+b : b+'-'+a));
+
+    // 随机加一些额外边
+    const extraCount = Math.floor(extraPool.length * (0.3 + Math.random() * 0.4));
+    const shuffled = extraPool.slice().sort(() => Math.random() - 0.5);
+    for (let i = 0; i < extraCount && i < shuffled.length; i++) {
+      const [a, b] = shuffled[i];
+      edgeSet.add(a < b ? a+'-'+b : b+'-'+a);
+    }
+
+    // 计算度数
+    const deg = Array(total).fill(0);
+    const result = [];
+    for (const key of edgeSet) {
+      const [a, b] = key.split('-').map(Number);
+      result.push([a, b]);
+      deg[a]++; deg[b]++;
+    }
+
+    // 奇度点数量
+    let odd = 0;
+    for (const d of deg) if (d % 2 === 1) odd++;
+    if (odd !== 0 && odd !== 2) return null;   // 不满足，重来
+
+    // 检查连通性（所有度数 >0 的点连成一片）
+    if (!isConnected(result, total)) return null;
+
+    // 边数不能太少，至少要 total-1
+    if (result.length < total - 1) return null;
+
+    return result;
+  }
+
+  function isConnected(edgeList, total) {
+    const adjL = Array.from({length: total}, () => []);
+    for (const [a, b] of edgeList) {
+      adjL[a].push(b);
+      adjL[b].push(a);
+    }
+    const start = edgeList[0][0];
+    const visited = new Set([start]);
+    const stack = [start];
+    while (stack.length) {
+      const u = stack.pop();
+      for (const v of adjL[u]) {
+        if (!visited.has(v)) { visited.add(v); stack.push(v); }
+      }
+    }
+    // 所有在边里出现过的点都要被访问到
+    const allNodes = new Set();
+    for (const [a, b] of edgeList) { allNodes.add(a); allNodes.add(b); }
+    for (const n of allNodes) if (!visited.has(n)) return false;
+    return true;
+  }
+
+  // ---------- 尺寸 ----------
+  function computeCellSize() {
+    const maxW = wrap.clientWidth;
+    const maxH = wrap.clientHeight;
+    const availW = maxW > 0 ? maxW : Math.min(window.innerWidth - 30, 440);
+    const availH = maxH > 0 ? maxH : Math.min(window.innerHeight - 280, 520);
+    const usable = Math.min(availW, availH) - MARGIN * 2;
+    const s = Math.floor(usable / (N - 1));
+    cellSize = Math.max(30, Math.min(s, 110));
+
+    const cw = (N - 1) * cellSize + MARGIN * 2;
+    const ch = (N - 1) * cellSize + MARGIN * 2;
+    if (boardCanvas.width !== cw || boardCanvas.height !== ch) {
+      boardCanvas.width = cw;
+      boardCanvas.height = ch;
+    }
+    boardCanvas.style.width = cw + 'px';
+    boardCanvas.style.height = ch + 'px';
+  }
+
+  // 节点索引 → 画布坐标
+  function nodeXY(i) {
+    const n = nodes[i];
+    return {
+      x: MARGIN + n.c * cellSize,
+      y: MARGIN + n.r * cellSize
+    };
+  }
+
+  // ---------- 绘制 ----------
+  function draw() {
+    const W = boardCanvas.width, H = boardCanvas.height;
+    if (W === 0 || H === 0) return;
+
+    ctx.fillStyle = '#0d0f12';
+    ctx.fillRect(0, 0, W, H);
+
+    // 未走过的边（暗）
+    ctx.lineCap = 'round';
+    for (const e of edges) {
+      if (e.used) continue;
+      const a = nodeXY(e.a), b = nodeXY(e.b);
+      ctx.strokeStyle = '#2f3644';
+      ctx.lineWidth = Math.max(4, cellSize * 0.14);
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+    }
+
+    // 已走过的边（亮）
+    for (const e of edges) {
+      if (!e.used) continue;
+      const a = nodeXY(e.a), b = nodeXY(e.b);
+      ctx.strokeStyle = '#5d9df9';
+      ctx.lineWidth = Math.max(5, cellSize * 0.18);
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+    }
+
+    // 节点
+    for (let i = 0; i < nodes.length; i++) {
+      const p = nodeXY(i);
+      const deg = adj[i].length;
+      if (deg === 0) continue;   // 孤点不画
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, Math.max(5, cellSize * 0.13), 0, Math.PI * 2);
+      ctx.fillStyle = '#1d2026';
+      ctx.fill();
+      ctx.strokeStyle = '#6c7484';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // 当前所在节点高亮
+      if (current === i && !won) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, Math.max(7, cellSize * 0.18), 0, Math.PI * 2);
+        ctx.fillStyle = '#7ee0a0';
+        ctx.fill();
+      }
+    }
+
+    // 通关
+    if (won) {
+      ctx.fillStyle = 'rgba(0,0,0,.72)';
+      ctx.fillRect(0, 0, W, H);
+      ctx.font = 'bold ' + Math.floor(Math.min(W, H) * 0.1) + 'px Arial, sans-serif';
+      ctx.fillStyle = '#7ee0a0';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('走通了！', W/2, H/2);
+    }
+  }
+
+  function updateUI() {
+    const used = edges.filter(e => e.used).length;
+    progressDisplay.textContent = used + '/' + edges.length;
+    levelDisplay.textContent = (parseInt(levelDisplay.textContent, 10) || 1);
+    sizeDisplay.textContent = N + '×' + N;
+  }
+
+  // ---------- 交互 ----------
+  let touchUsed = false;
+
+  function getNodeFromEvent(e) {
+    const rect = boardCanvas.getBoundingClientRect();
+    let clientX, clientY;
+    if (e.changedTouches && e.changedTouches.length) {
+      clientX = e.changedTouches[0].clientX;
+      clientY = e.changedTouches[0].clientY;
+    } else if (e.touches && e.touches.length) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+    const x = (clientX - rect.left) / rect.width * boardCanvas.width;
+    const y = (clientY - rect.top) / rect.height * boardCanvas.height;
+
+    // 找最近的节点
+    let best = -1, bestDist = Infinity;
+    for (let i = 0; i < nodes.length; i++) {
+      if (adj[i].length === 0) continue;
+      const p = nodeXY(i);
+      const d = Math.hypot(x - p.x, y - p.y);
+      if (d < bestDist) { bestDist = d; best = i; }
+    }
+    const threshold = Math.max(20, cellSize * 0.4);
+    if (bestDist > threshold) return -1;
+    return best;
+  }
+
+  function handleNodeInput(idx) {
+    if (won || idx < 0) return;
+    if (current === -1) {
+      // 起点
+      current = idx;
+      pathNodes = [idx];
+      draw();
+      updateUI();
+      return;
+    }
+    if (idx === current) return;
+
+    // 必须是相邻节点，且边未使用
+    const link = adj[current].find(l => l.to === idx && !edges[l.edge].used);
+    if (!link) return;
+
+    // 走这条边
+    edges[link.edge].used = true;
+    drawnEdges.push(link.edge);
+    current = idx;
+    pathNodes.push(idx);
+
+    draw();
+    updateUI();
+    checkWin();
+  }
+
+  function checkWin() {
+    if (edges.every(e => e.used)) {
+      won = true;
+      draw();
+    }
+  }
+
+  boardCanvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    touchUsed = true;
+    const idx = getNodeFromEvent(e);
+    handleNodeInput(idx);
+  }, { passive: false });
+
+  boardCanvas.addEventListener('touchmove', (e) => {
+    // 拖动经过节点也支持（更顺滑）
+    e.preventDefault();
+    const idx = getNodeFromEvent(e);
+    if (idx >= 0 && idx !== current) {
+      // 如果和当前相邻且边未用，就走过去
+      if (current >= 0) {
+        const link = adj[current].find(l => l.to === idx && !edges[l.edge].used);
+        if (link) handleNodeInput(idx);
+      }
+    }
+  }, { passive: false });
+
+  boardCanvas.addEventListener('touchend', (e) => { e.preventDefault(); }, { passive: false });
+
+  boardCanvas.addEventListener('mousedown', (e) => {
+    if (touchUsed) return;
+    const idx = getNodeFromEvent(e);
+    handleNodeInput(idx);
+  });
+  boardCanvas.addEventListener('mouseup', () => { touchUsed = false; });
+
+  // ---------- 撤销 / 重走 ----------
+  function undo() {
+    if (won || drawnEdges.length === 0) return;
+    const last = drawnEdges.pop();
+    edges[last].used = false;
+    pathNodes.pop();
+    current = pathNodes[pathNodes.length - 1];
+    draw();
+    updateUI();
+  }
+  undoBtn.addEventListener('click', undo);
+  undoBtn.addEventListener('touchstart', (e) => { e.preventDefault(); undo(); }, { passive: false });
+
+  function restart() {
+    for (const e of edges) e.used = false;
+    drawnEdges = [];
+    pathNodes = [];
+    current = -1;
+    won = false;
+    draw();
+    updateUI();
+  }
+  restartBtn.addEventListener('click', restart);
+  restartBtn.addEventListener('touchstart', (e) => { e.preventDefault(); restart(); }, { passive: false });
+
+  // ---------- 关卡 ----------
+  let level = 1;
+
+  function nextLevel() {
+    level++;
+    levelDisplay.textContent = level;
+    generateLevel();
+  }
+  nextBtn.addEventListener('click', nextLevel);
+  nextBtn.addEventListener('touchstart', (e) => { e.preventDefault(); nextLevel(); }, { passive: false });
+
+  // ---------- 尺寸选择 ----------
+  function openSize() {
+    sizeOverlay.querySelectorAll('.level-btn[data-size]').forEach(btn => {
+      btn.classList.toggle('active', parseInt(btn.dataset.size, 10) === N);
+    });
+    sizeOverlay.classList.remove('hidden');
+  }
+  sizeBtn.addEventListener('click', openSize);
+  sizeBtn.addEventListener('touchstart', (e) => { e.preventDefault(); openSize(); }, { passive: false });
+
+  sizeOverlay.querySelectorAll('.level-btn[data-size]').forEach(btn => {
+    const handler = (e) => {
+      e.preventDefault();
+      N = parseInt(btn.dataset.size, 10);
+      sizeOverlay.classList.add('hidden');
+      level = 1;
+      levelDisplay.textContent = level;
+      generateLevel();
+    };
+    btn.addEventListener('click', handler);
+    btn.addEventListener('touchstart', handler, { passive: false });
+  });
+  sizeClose.addEventListener('click', () => sizeOverlay.classList.add('hidden'));
+  sizeClose.addEventListener('touchstart', (e) => { e.preventDefault(); sizeOverlay.classList.add('hidden'); }, { passive: false });
+
+  window.addEventListener('resize', () => { computeCellSize(); draw(); });
+  window.addEventListener('orientationchange', () => { setTimeout(() => { computeCellSize(); draw(); }, 200); });
+
+  // 启动
+  generateLevel();
+})();
+</script>
+</body>
+</html>

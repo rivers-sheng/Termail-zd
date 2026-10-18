@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>跳一跳</title>
+<style>
+  * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #15171c;
+    font-family: Arial, "Microsoft YaHei", sans-serif;
+    overflow: hidden;
+  }
+  body { display: flex; justify-content: center; align-items: center; padding: 6px; }
+
+  .game-container {
+    background: #1d2026;
+    border: 1px solid #333842;
+    padding: 8px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    width: 100%; height: 100%;
+    max-width: 460px;
+  }
+
+  .top-row { display: flex; gap: 6px; width: 100%; flex: 0 0 auto; }
+  .info-box {
+    flex: 1;
+    background: #14161a; border: 1px solid #333842;
+    padding: 4px 10px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .info-box .label { color: #6c7484; font-size: 12px; }
+  .info-box .value { color: #d8d8d8; font-size: 18px; font-weight: bold; }
+  .info-box .value.best { color: #f6d365; }
+
+  .board-wrap {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+  }
+  canvas#board {
+    display: block;
+    background: #1a1e26;
+    border: 1px solid #333842;
+    touch-action: none;
+  }
+
+  .status {
+    text-align: center;
+    color: #b7c0d0;
+    font-size: 14px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    min-height: 20px;
+    flex: 0 0 auto;
+  }
+
+  .touch-controls { width: 100%; display: flex; gap: 5px; flex: 0 0 auto; }
+  .touch-btn {
+    flex: 1;
+    background: #262a32; border: 1px solid #3a404b; color: #cfd4dc;
+    border-radius: 4px; font-size: 14px; font-family: inherit;
+    padding: 11px 0; cursor: pointer;
+  }
+  .touch-btn:active { background: #313742; }
+
+  .hint {
+    text-align: center;
+    color: #6c7484;
+    font-size: 11px;
+    letter-spacing: 1px;
+    margin-top: 2px;
+  }
+
+  .overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.75);
+    display: flex; justify-content: center; align-items: center;
+    z-index: 10;
+  }
+  .overlay.hidden { display: none; }
+  .panel {
+    background: #1d2026; border: 1px solid #3a404b; border-radius: 8px;
+    padding: 22px 26px; min-width: 260px; max-width: 90%;
+    color: #cfd4dc; font-size: 14px; text-align: center;
+  }
+  .panel h3 { margin: 0 0 16px; font-size: 17px; color: #e0e0e0; font-weight: normal; letter-spacing: 2px; }
+  .panel .big { font-size: 32px; font-weight: bold; color: #7ee0a0; margin: 8px 0 4px; }
+  .panel .sub { color: #8a94a6; font-size: 13px; margin-bottom: 18px; }
+  .panel button {
+    width: 100%; padding: 11px 0; margin-top: 8px;
+    background: #262a32; border: 1px solid #3a404b;
+    color: #cfd4dc; border-radius: 4px; font-family: inherit; font-size: 14px; cursor: pointer;
+  }
+  .panel button.primary { background: #2b3a4a; border-color: #3a4f6b; color: #b8cbe8; }
+  .panel button:active { background: #313742; }
+</style>
+</head>
+<body>
+<div class="game-container">
+  <div class="top-row">
+    <div class="info-box">
+      <span class="label">分数</span>
+      <span class="value" id="scoreDisplay">0</span>
+    </div>
+    <div class="info-box">
+      <span class="label">最高</span>
+      <span class="value best" id="bestDisplay">0</span>
+    </div>
+  </div>
+
+  <div class="board-wrap">
+    <canvas id="board"></canvas>
+  </div>
+
+  <div class="status" id="statusText">长按蓄力，松手起跳</div>
+
+  <div class="touch-controls">
+    <button class="touch-btn" id="resetBtn">重新开始</button>
+  </div>
+</div>
+
+<div class="overlay hidden" id="overOverlay">
+  <div class="panel">
+    <h3>掉下去了</h3>
+    <div class="big" id="finalScore">0</div>
+    <div class="sub" id="finalBest">最高 0</div>
+    <button class="primary" id="overRestart">再来一次</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  const canvas = document.getElementById('board');
+  const ctx = canvas.getContext('2d');
+  const wrap = canvas.parentElement;
+  const scoreDisplay = document.getElementById('scoreDisplay');
+  const bestDisplay = document.getElementById('bestDisplay');
+  const statusText = document.getElementById('statusText');
+  const resetBtn = document.getElementById('resetBtn');
+  const overOverlay = document.getElementById('overOverlay');
+  const finalScore = document.getElementById('finalScore');
+  const finalBest = document.getElementById('finalBest');
+  const overRestart = document.getElementById('overRestart');
+
+  // 逻辑尺寸
+  const W = 400, H = 640;
+
+  // 方块尺寸
+  const BLOCK_W = 72;       // 方块宽度（水平方向）
+  const BLOCK_D = 44;       // 方块"深度"（在屏幕上画成的高度）
+  const CENTER_Y = H * 0.68;  // 方块顶面所在的屏幕 y 坐标（偏下一点）
+
+  // 跳跃参数
+  const MAX_POWER = 260;     // 满蓄力跳多远（世界坐标）
+  const POWER_RATE = 0.0016; // 蓄力速度
+  const GRAVITY = 0.0009;    // 重力加速度（世界坐标/ms²）
+  const JUMP_HEIGHT = 90;    // 跳跃最高点（世界坐标）
+
+  // 世界坐标：x 向右，y 向上，方块顶面 y=0
+  let blocks = [];           // {x, color}
+  let player = { x: 0, y: 0, vx: 0, vy: 0, rot: 0 };
+  let score = 0, best = 0;
+  let charging = false;
+  let power = 0;
+  let state = 'ready';       // ready / jumping / done
+  let camX = 0;
+  let particleText = [];
+  let squash = 0;            // 落地压扁动画
+
+  try { best = parseInt(localStorage.getItem('jump_best') || '0', 10); } catch(e) { best = 0; }
+  if (isNaN(best)) best = 0;
+
+  let rafId = null;
+  let lastTime = 0;
+
+  const COLORS = ['#5d9df9', '#5cdb95', '#f6d365', '#b286fe', '#f9a26c', '#3ec1d3'];
+
+  // ---------- 初始化 ----------
+  function initGame() {
+    cancelAnimationFrame(rafId);
+    rafId = null;
+
+    blocks = [];
+    blocks.push(makeBlock(0));
+    const gap = randomGap();
+    blocks.push(makeBlock(BLOCK_W + gap));
+
+    player = { x: 0, y: 0, vx: 0, vy: 0, rot: 0 };
+    score = 0;
+    charging = false;
+    power = 0;
+    state = 'ready';
+    camX = 0;
+    particleText = [];
+    squash = 0;
+
+    overOverlay.classList.add('hidden');
+    updateUI();
+    resizeCanvas();
+    draw();
+    lastTime = 0;
+    rafId = requestAnimationFrame(loop);
+    requestAnimationFrame(() => { resizeCanvas(); draw(); });
+  }
+
+  function makeBlock(x) {
+    return {
+      x: x,
+      w: BLOCK_W,
+      color: COLORS[Math.floor(Math.random() * COLORS.length)]
+    };
+  }
+
+  function randomGap() {
+    // 间距在蓄力能覆盖的范围内（留点余量）
+    const min = BLOCK_W * 0.5;
+    const max = MAX_POWER * 0.85;
+    return min + Math.random() * (max - min);
+  }
+
+  function resizeCanvas() {
+    const maxW = wrap.clientWidth;
+    const maxH = wrap.clientHeight;
+    const availW = maxW > 0 ? maxW : Math.min(window.innerWidth - 30, 440);
+    const availH = maxH > 0 ? maxH : Math.min(window.innerHeight - 200, 620);
+    const scale = Math.min(availW / W, availH / H);
+    const cw = Math.max(200, Math.floor(W * scale));
+    const ch = Math.max(320, Math.floor(H * scale));
+    if (canvas.width !== W || canvas.height !== H) {
+      canvas.width = W;
+      canvas.height = H;
+    }
+    canvas.style.width = cw + 'px';
+    canvas.style.height = ch + 'px';
+  }
+
+  function updateUI() {
+    scoreDisplay.textContent = score;
+    bestDisplay.textContent = best;
+  }
+
+  // ---------- 主循环 ----------
+  function loop(now) {
+    rafId = requestAnimationFrame(loop);
+    if (!lastTime) lastTime = now;
+    let dt = now - lastTime;
+    lastTime = now;
+    if (dt > 50) dt = 50;
+
+    update(dt);
+    draw();
+  }
+
+  function update(dt) {
+    // 蓄力
+    if (charging) {
+      power += POWER_RATE * dt;
+      if (power > 1) power = 1;
+      statusText.textContent = '蓄力 ' + Math.floor(power * 100) + '%';
+    }
+
+    // 跳跃中
+    if (state === 'jumping') {
+      player.x += player.vx * dt;
+      player.vy -= GRAVITY * dt;   // y 向上为正，重力向下（负）
+      player.y += player.vy * dt;
+
+      // 旋转（跳跃时翻跟头）
+      player.rot += dt * 0.012 * (player.vx > 0 ? 1 : -1);
+
+      // 落地判定
+      if (player.y <= 0) {
+        player.y = 0;
+        land();
+      }
+    }
+
+    // 落地压扁恢复
+    if (squash > 0) {
+      squash -= dt * 0.005;
+      if (squash < 0) squash = 0;
+    }
+
+    // 相机平滑跟随：玩家在屏幕左侧约 1/3 处
+    const targetX = player.x - W * 0.32;
+    camX += (targetX - camX) * 0.14;
+
+    // 飘字上浮
+    for (let i = particleText.length - 1; i >= 0; i--) {
+      const t = particleText[i];
+      t.y += 0.05 * dt;
+      t.life -= dt;
+      if (t.life <= 0) particleText.splice(i, 1);
+    }
+  }
+
+  // 落地
+  function land() {
+    // 找脚下的方块
+    let landingBlock = null;
+    for (const b of blocks) {
+      if (player.x >= b.x - b.w / 2 && player.x <= b.x + b.w / 2) {
+        landingBlock = b;
+        break;
+      }
+    }
+
+    if (!landingBlock) {
+      // 没落上，掉下去
+      state = 'done';
+      gameOver();
+      return;
+    }
+
+    // 落点质量
+    const dx = player.x - landingBlock.x;
+    const absDx = Math.abs(dx);
+    const half = landingBlock.w / 2;
+
+    let addScore = 0;
+    let label = '';
+    if (absDx < half * 0.2) {
+      addScore = 3; label = '完美 +3';
+    } else if (absDx < half * 0.6) {
+      addScore = 2; label = '不错 +2';
+    } else {
+      addScore = 1; label = '+1';
+    }
+
+    // 落点吸附（不越界）
+    player.x = Math.max(landingBlock.x - half + 4, Math.min(landingBlock.x + half - 4, player.x));
+
+    score += addScore;
+    if (score > best) {
+      best = score;
+      try { localStorage.setItem('jump_best', String(best)); } catch(e) {}
+    }
+    updateUI();
+
+    // 飘分
+    particleText.push({
+      x: player.x,
+      y: 40,
+      text: label,
+      life: 800,
+      color: addScore === 3 ? '#7ee0a0' : addScore === 2 ? '#f6d365' : '#d8d8d8'
+    });
+
+    // 生成新方块
+    if (landingBlock === blocks[blocks.length - 1]) {
+      blocks.push(makeBlock(landingBlock.x + randomGap()));
+    }
+
+    // 移除太远的方块
+    while (blocks.length > 6 && blocks[0].x < camX - 200) {
+      blocks.shift();
+    }
+
+    // 落地压扁动画
+    squash = 1;
+
+    state = 'ready';
+    player.rot = 0;
+    power = 0;
+    statusText.textContent = '长按蓄力，松手起跳';
+  }
+
+  function jump() {
+    // 水平距离
+    const distance = power * MAX_POWER;
+    // 抛物线：最高点 = JUMP_HEIGHT
+    // vy0 = sqrt(2 * g * h)
+    const vy0 = Math.sqrt(2 * GRAVITY * JUMP_HEIGHT);
+    // 飞行时间（上升 + 下降）：t = 2 * vy0 / g
+    const flightTime = 2 * vy0 / GRAVITY;
+    const vx = distance / flightTime;
+
+    player.vx = vx;
+    player.vy = vy0;
+    state = 'jumping';
+    statusText.textContent = '起跳！';
+  }
+
+  function gameOver() {
+    charging = false;
+    if (score > best) {
+      best = score;
+      try { localStorage.setItem('jump_best', String(best)); } catch(e) {}
+    }
+    updateUI();
+    finalScore.textContent = score;
+    finalBest.textContent = '最高 ' + best;
+    overOverlay.classList.remove('hidden');
+  }
+
+  // ---------- 绘制 ----------
+  function draw() {
+    const cw = canvas.width, ch = canvas.height;
+    if (cw === 0 || ch === 0) return;
+
+    // 背景
+    const g = ctx.createLinearGradient(0, 0, 0, ch);
+    g.addColorStop(0, '#1a1e26');
+    g.addColorStop(1, '#15171c');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, cw, ch);
+
+    // 背景装饰线（淡淡的水平线）
+    ctx.strokeStyle = 'rgba(255,255,255,.03)';
+    ctx.lineWidth = 1;
+    for (let y = 0; y < ch; y += 40) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(cw, y);
+      ctx.stroke();
+    }
+
+    // 世界 -> 屏幕
+    // 屏幕 x = 世界 x - camX + 屏幕偏移(玩家在左侧 1/3)
+    const screenX = (wx) => wx - camX;
+    // 世界 y=0（方块顶面）对应屏幕 CENTER_Y；y 向上 → 屏幕 y 减小
+    const screenY = (wy) => CENTER_Y - wy;
+
+    // 画方块（从后往前画，避免遮挡）
+    for (const b of blocks) {
+      const sx = screenX(b.x);
+      if (sx < -150 || sx > cw + 150) continue;   // 屏幕外不画
+      drawBlock(sx, screenY(0), b.w, b.color);
+    }
+
+    // 画玩家
+    if (state !== 'done') {
+      drawPlayer(screenX(player.x), screenY(player.y));
+    }
+
+    // 蓄力条
+    if (charging) {
+      drawPowerBar();
+    }
+
+    // 飘字
+    for (const t of particleText) {
+      const sx = screenX(t.x);
+      const sy = screenY(t.y);
+      ctx.globalAlpha = Math.min(1, t.life / 400);
+      ctx.fillStyle = t.color;
+      ctx.font = 'bold 16px Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(t.text, sx, sy);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // 画一个 3D 方块（顶面 + 正面）
+  function drawBlock(cx, topY, w, color) {
+    const halfW = w / 2;
+    const depth = BLOCK_D;
+
+    // 正面（下方的矩形，颜色暗一点）
+    ctx.fillStyle = shade(color, -0.3);
+    ctx.fillRect(cx - halfW, topY, w, depth);
+
+    // 顶面（上方的矩形，颜色亮一点）
+    ctx.fillStyle = color;
+    ctx.fillRect(cx - halfW, topY - depth, w, depth);
+
+    // 描边
+    ctx.strokeStyle = 'rgba(0,0,0,.35)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(cx - halfW + 0.5, topY - depth + 0.5, w - 1, depth * 2 - 1);
+
+    // 顶面高光
+    ctx.fillStyle = 'rgba(255,255,255,.15)';
+    ctx.fillRect(cx - halfW + 2, topY - depth + 2, w - 4, 4);
+  }
+
+  // 画玩家（站在方块顶面上）
+  function drawPlayer(cx, groundY) {
+    // groundY 是方块顶面的屏幕 y
+    const r = 13;
+    // 玩家脚底 = 方块顶面；身体中心往上 r
+    const feetY = groundY - BLOCK_D;   // 顶面的屏幕 y
+    const centerY = feetY - r;
+
+    // 落地压扁
+    let rx = r, ry = r;
+    if (squash > 0) {
+      rx = r * (1 + squash * 0.3);
+      ry = r * (1 - squash * 0.3);
+    }
+
+    // 阴影
+    ctx.fillStyle = 'rgba(0,0,0,.35)';
+    ctx.beginPath();
+    ctx.ellipse(cx, feetY + 2, r * 0.9, r * 0.3, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 身体
+    ctx.save();
+    ctx.translate(cx, centerY);
+    ctx.rotate(player.rot);
+    ctx.scale(rx / r, ry / r);
+
+    // 白色球体
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.fillStyle = '#f0f0f0';
+    ctx.fill();
+    ctx.strokeStyle = '#8a94a6';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // 高光
+    ctx.beginPath();
+    ctx.arc(-r * 0.3, -r * 0.3, r * 0.35, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,.7)';
+    ctx.fill();
+
+    // 眼睛
+    ctx.fillStyle = '#1d2026';
+    ctx.beginPath();
+    ctx.arc(-4, -2, 2, 0, Math.PI * 2);
+    ctx.arc(4, -2, 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+
+    // 蓄力时抖动
+    if (charging) {
+      const shake = Math.sin(Date.now() / 30) * (power * 2);
+      ctx.strokeStyle = '#f6d365';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(cx + shake - r, feetY + 4);
+      ctx.lineTo(cx + shake + r, feetY + 4);
+      ctx.stroke();
+    }
+  }
+
+  function drawPowerBar() {
+    const cw = canvas.width;
+    const barW = cw * 0.6;
+    const barH = 12;
+    const x = (cw - barW) / 2;
+    const y = canvas.height - 44;
+
+    // 背景
+    ctx.fillStyle = 'rgba(0,0,0,.6)';
+    ctx.fillRect(x - 3, y - 3, barW + 6, barH + 6);
+    ctx.fillStyle = '#262a32';
+    ctx.fillRect(x, y, barW, barH);
+
+    // 进度
+    const g = ctx.createLinearGradient(x, 0, x + barW, 0);
+    g.addColorStop(0, '#5cdb95');
+    g.addColorStop(0.6, '#f6d365');
+    g.addColorStop(1, '#ff6f61');
+    ctx.fillStyle = g;
+    ctx.fillRect(x, y, barW * power, barH);
+
+    // 边框
+    ctx.strokeStyle = 'rgba(255,255,255,.3)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, barW - 1, barH - 1);
+  }
+
+  function shade(hex, amt) {
+    let c = hex.replace('#', '');
+    if (c.length === 3) c = c.split('').map(x => x + x).join('');
+    let r = parseInt(c.substr(0, 2), 16);
+    let g = parseInt(c.substr(2, 2), 16);
+    let b = parseInt(c.substr(4, 2), 16);
+    r = Math.max(0, Math.min(255, Math.round(r * (1 + amt))));
+    g = Math.max(0, Math.min(255, Math.round(g * (1 + amt))));
+    b = Math.max(0, Math.min(255, Math.round(b * (1 + amt))));
+    return `rgb(${r},${g},${b})`;
+  }
+
+  // ---------- 输入 ----------
+  function onPressStart(e) {
+    e.preventDefault();
+    if (state !== 'ready') return;
+    charging = true;
+    power = 0;
+  }
+
+  function onPressEnd(e) {
+    e.preventDefault();
+    if (!charging) return;
+    if (state !== 'ready') return;
+    charging = false;
+    if (power < 0.05) {
+      power = 0;
+      statusText.textContent = '长按蓄力，松手起跳';
+      return;
+    }
+    jump();
+  }
+
+  canvas.addEventListener('touchstart', onPressStart, { passive: false });
+  canvas.addEventListener('touchend', onPressEnd, { passive: false });
+  canvas.addEventListener('touchcancel', onPressEnd, { passive: false });
+
+  canvas.addEventListener('mousedown', onPressStart);
+  canvas.addEventListener('mouseup', onPressEnd);
+  canvas.addEventListener('mouseleave', (e) => {
+    if (charging) onPressEnd(e);
+  });
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key === ' ' && !e.repeat) {
+      e.preventDefault();
+      onPressStart(e);
+    }
+  });
+  window.addEventListener('keyup', (e) => {
+    if (e.key === ' ') {
+      e.preventDefault();
+      onPressEnd(e);
+    }
+  });
+
+  resetBtn.addEventListener('click', initGame);
+  resetBtn.addEventListener('touchstart', (e) => { e.preventDefault(); initGame(); }, { passive: false });
+
+  overRestart.addEventListener('click', initGame);
+  overRestart.addEventListener('touchstart', (e) => { e.preventDefault(); initGame(); }, { passive: false });
+
+  window.addEventListener('resize', () => { resizeCanvas(); draw(); });
+  window.addEventListener('orientationchange', () => { setTimeout(() => { resizeCanvas(); draw(); }, 200); });
+
+  initGame();
+})();
+</script>
+</body>
+</html>

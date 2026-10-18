@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>井字棋</title>
+<style>
+  * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #15171c;
+    font-family: Arial, "Microsoft YaHei", sans-serif;
+    overflow: hidden;
+  }
+  body { display: flex; justify-content: center; align-items: center; padding: 6px; }
+
+  .game-container {
+    background: #1d2026;
+    border: 1px solid #333842;
+    padding: 8px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    width: 100%; height: 100%;
+    max-width: 460px;
+  }
+
+  .top-row { display: flex; gap: 6px; width: 100%; flex: 0 0 auto; }
+  .info-box {
+    flex: 1;
+    background: #14161a; border: 1px solid #333842;
+    padding: 4px 10px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .info-box .label { color: #6c7484; font-size: 12px; }
+  .info-box .value { color: #d8d8d8; font-size: 18px; font-weight: bold; }
+  .info-box .value.win { color: #7ee0a0; }
+  .info-box .value.lose { color: #ff6f61; }
+  .info-box .value.draw { color: #f6d365; }
+
+  .board-wrap {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+  }
+  canvas#board {
+    display: block;
+    background: #0d0f12;
+    border: 1px solid #333842;
+    touch-action: none;
+  }
+
+  .status {
+    text-align: center;
+    color: #b7c0d0;
+    font-size: 15px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    min-height: 22px;
+    flex: 0 0 auto;
+  }
+
+  .touch-controls { width: 100%; display: flex; flex-direction: column; gap: 5px; flex: 0 0 auto; }
+  .control-row { display: flex; gap: 5px; }
+  .touch-btn {
+    flex: 1;
+    background: #262a32; border: 1px solid #3a404b; color: #cfd4dc;
+    border-radius: 4px; font-size: 14px; font-family: inherit;
+    padding: 11px 0; cursor: pointer;
+  }
+  .touch-btn:active { background: #313742; }
+  .touch-btn.active { background: #3a4f6b; border-color: #5a7aa0; color: #d8e6ff; }
+  .touch-btn.small { font-size: 12px; }
+
+  .hint {
+    text-align: center;
+    color: #6c7484;
+    font-size: 11px;
+    letter-spacing: 1px;
+    margin-top: 2px;
+  }
+
+  .overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.7);
+    display: flex; justify-content: center; align-items: center;
+    z-index: 10;
+  }
+  .overlay.hidden { display: none; }
+  .panel {
+    background: #1d2026; border: 1px solid #3a404b; border-radius: 8px;
+    padding: 20px 24px; min-width: 250px; max-width: 90%;
+    color: #cfd4dc; font-size: 14px;
+  }
+  .panel h3 { margin: 0 0 16px; font-size: 16px; color: #e0e0e0; text-align: center; font-weight: normal; letter-spacing: 2px; }
+  .level-btn {
+    display: block; width: 100%; margin-bottom: 8px;
+    background: #262a32; border: 1px solid #3a404b; color: #cfd4dc;
+    border-radius: 4px; padding: 11px 0; font-family: inherit; font-size: 14px; cursor: pointer;
+  }
+  .level-btn.active { background: #3a4f6b; border-color: #5a7aa0; color: #d8e6ff; }
+  .level-btn:active { background: #313742; }
+  .panel .close { margin-top: 12px; }
+</style>
+</head>
+<body>
+<div class="game-container">
+  <div class="top-row">
+    <div class="info-box">
+      <span class="label">你</span>
+      <span class="value" id="youScore">0</span>
+    </div>
+    <div class="info-box">
+      <span class="label">AI</span>
+      <span class="value" id="aiScore">0</span>
+    </div>
+    <div class="info-box">
+      <span class="label">平局</span>
+      <span class="value" id="drawScore">0</span>
+    </div>
+  </div>
+
+  <div class="board-wrap">
+    <canvas id="board"></canvas>
+  </div>
+
+  <div class="status" id="statusText">你的回合（先手）</div>
+
+  <div class="touch-controls">
+    <div class="control-row">
+      <button class="touch-btn" id="firstBtn">先手</button>
+      <button class="touch-btn" id="secondBtn">后手</button>
+    </div>
+    <div class="control-row">
+      <button class="touch-btn small" id="diffBtn">难度：无敌</button>
+      <button class="touch-btn small" id="resetBtn">重开</button>
+    </div>
+    <div class="hint">点格子落子，连成一线即胜</div>
+  </div>
+</div>
+
+<div class="overlay hidden" id="diffOverlay">
+  <div class="panel">
+    <h3>选择难度</h3>
+    <button class="level-btn" data-diff="easy">简单 · 随机为主</button>
+    <button class="level-btn" data-diff="normal">普通 · 会防守</button>
+    <button class="level-btn" data-diff="hard">无敌 · 无法战胜</button>
+    <button class="level-btn close" id="diffClose">取消</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  const boardCanvas = document.getElementById('board');
+  const ctx = boardCanvas.getContext('2d');
+  const wrap = boardCanvas.parentElement;
+  const statusText = document.getElementById('statusText');
+  const youScoreEl = document.getElementById('youScore');
+  const aiScoreEl = document.getElementById('aiScore');
+  const drawScoreEl = document.getElementById('drawScore');
+  const firstBtn = document.getElementById('firstBtn');
+  const secondBtn = document.getElementById('secondBtn');
+  const diffBtn = document.getElementById('diffBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const diffOverlay = document.getElementById('diffOverlay');
+  const diffClose = document.getElementById('diffClose');
+
+  // 棋盘：0 空，1 玩家，2 AI
+  let board = Array(9).fill(0);
+  let playerTurn = true;
+  let gameEnd = false;
+  let winLine = null;
+  let playerFirst = true;      // 玩家是否先手
+  let difficulty = 'hard';     // easy / normal / hard
+  let touchUsed = false;
+  let aiThinking = false;
+
+  let scores = { you: 0, ai: 0, draw: 0 };
+
+  let cellSize = 100;
+
+  const LINES = [
+    [0,1,2], [3,4,5], [6,7,8],
+    [0,3,6], [1,4,7], [2,5,8],
+    [0,4,8], [2,4,6]
+  ];
+
+  // ---------- 初始化 ----------
+  function initGame() {
+    board = Array(9).fill(0);
+    gameEnd = false;
+    winLine = null;
+    aiThinking = false;
+    playerTurn = playerFirst;
+    statusText.textContent = playerFirst ? '你的回合（先手）' : 'AI 回合';
+    updateScoreUI();
+    computeCellSize();
+    draw();
+    requestAnimationFrame(() => { computeCellSize(); draw(); });
+
+    // 玩家后手，AI 先走
+    if (!playerFirst) {
+      aiThinking = true;
+      setTimeout(() => { aiMove(); }, 300);
+    }
+  }
+
+  function computeCellSize() {
+    const maxW = wrap.clientWidth;
+    const maxH = wrap.clientHeight;
+    const availW = maxW > 0 ? maxW : Math.min(window.innerWidth - 30, 440);
+    const availH = maxH > 0 ? maxH : Math.min(window.innerHeight - 280, 440);
+    cellSize = Math.max(60, Math.floor(Math.min(availW, availH) / 3));
+    const size = cellSize * 3;
+    if (boardCanvas.width !== size || boardCanvas.height !== size) {
+      boardCanvas.width = size;
+      boardCanvas.height = size;
+    }
+    boardCanvas.style.width = size + 'px';
+    boardCanvas.style.height = size + 'px';
+  }
+
+  function updateScoreUI() {
+    youScoreEl.textContent = scores.you;
+    aiScoreEl.textContent = scores.ai;
+    drawScoreEl.textContent = scores.draw;
+    youScoreEl.className = 'value win';
+    aiScoreEl.className = 'value lose';
+    drawScoreEl.className = 'value draw';
+  }
+
+  // ---------- 绘制 ----------
+  function draw() {
+    const W = boardCanvas.width, H = boardCanvas.height;
+    if (W === 0 || H === 0) return;
+
+    ctx.fillStyle = '#0d0f12';
+    ctx.fillRect(0, 0, W, H);
+
+    // 网格线
+    ctx.strokeStyle = '#3a404b';
+    ctx.lineWidth = 3;
+    for (let i = 1; i < 3; i++) {
+      ctx.beginPath();
+      ctx.moveTo(i * cellSize, 0);
+      ctx.lineTo(i * cellSize, H);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0, i * cellSize);
+      ctx.lineTo(W, i * cellSize);
+      ctx.stroke();
+    }
+
+    // 棋子
+    for (let i = 0; i < 9; i++) {
+      const r = Math.floor(i / 3), c = i % 3;
+      const cx = c * cellSize + cellSize / 2;
+      const cy = r * cellSize + cellSize / 2;
+
+      if (board[i] === 1) {
+        // 玩家：O（蓝）
+        ctx.strokeStyle = '#5d9df9';
+        ctx.lineWidth = Math.max(4, cellSize * 0.09);
+        ctx.beginPath();
+        ctx.arc(cx, cy, cellSize * 0.28, 0, Math.PI * 2);
+        ctx.stroke();
+      } else if (board[i] === 2) {
+        // AI：X（红）
+        ctx.strokeStyle = '#ff6f61';
+        ctx.lineWidth = Math.max(4, cellSize * 0.09);
+        const s = cellSize * 0.26;
+        ctx.beginPath();
+        ctx.moveTo(cx - s, cy - s);
+        ctx.lineTo(cx + s, cy + s);
+        ctx.moveTo(cx + s, cy - s);
+        ctx.lineTo(cx - s, cy + s);
+        ctx.stroke();
+      }
+    }
+
+    // 胜利连线
+    if (winLine) {
+      const [a, , c] = winLine;
+      const ar = Math.floor(a / 3), ac = a % 3;
+      const cr = Math.floor(c / 3), cc = c % 3;
+      ctx.strokeStyle = '#f6d365';
+      ctx.lineWidth = Math.max(4, cellSize * 0.07);
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(ac * cellSize + cellSize/2, ar * cellSize + cellSize/2);
+      ctx.lineTo(cc * cellSize + cellSize/2, cr * cellSize + cellSize/2);
+      ctx.stroke();
+    }
+  }
+
+  // ---------- 胜负判定 ----------
+  function checkWinner(b) {
+    for (const line of LINES) {
+      const [x, y, z] = line;
+      if (b[x] && b[x] === b[y] && b[y] === b[z]) {
+        return { winner: b[x], line };
+      }
+    }
+    if (b.every(v => v !== 0)) return { winner: 0, line: null };  // 平局
+    return null;
+  }
+
+  function endGame(result) {
+    gameEnd = true;
+    if (result.winner === 1) {
+      scores.you++;
+      statusText.textContent = '你赢了！';
+    } else if (result.winner === 2) {
+      scores.ai++;
+      statusText.textContent = 'AI 赢了';
+    } else {
+      scores.draw++;
+      statusText.textContent = '平局';
+    }
+    if (result.line) winLine = result.line;
+    updateScoreUI();
+    draw();
+  }
+
+  // ---------- 玩家落子 ----------
+  function playerMove(idx) {
+    if (gameEnd || !playerTurn || aiThinking) return;
+    if (board[idx] !== 0) return;
+    board[idx] = 1;
+    draw();
+
+    const res = checkWinner(board);
+    if (res) { endGame(res); return; }
+
+    playerTurn = false;
+    statusText.textContent = 'AI 思考中…';
+    aiThinking = true;
+    setTimeout(() => { aiMove(); }, 300);
+  }
+
+  // ---------- AI 落子 ----------
+  function aiMove() {
+    if (gameEnd) { aiThinking = false; return; }
+    let idx;
+    if (difficulty === 'easy') {
+      idx = randomMove();
+    } else if (difficulty === 'normal') {
+      idx = normalMove();
+    } else {
+      idx = bestMove(board, 2).index;
+    }
+    if (idx === undefined || idx === -1) { aiThinking = false; return; }
+
+    board[idx] = 2;
+    draw();
+
+    const res = checkWinner(board);
+    if (res) { endGame(res); aiThinking = false; return; }
+
+    playerTurn = true;
+    aiThinking = false;
+    statusText.textContent = '你的回合';
+  }
+
+  function emptyIndices(b) {
+    const res = [];
+    for (let i = 0; i < 9; i++) if (b[i] === 0) res.push(i);
+    return res;
+  }
+
+  function randomMove() {
+    const empty = emptyIndices(board);
+    return empty[Math.floor(Math.random() * empty.length)];
+  }
+
+  // 普通：能赢就赢，能挡就挡，否则随机
+  function normalMove() {
+    // 赢
+    for (const i of emptyIndices(board)) {
+      const test = board.slice();
+      test[i] = 2;
+      if (checkWinner(test) && checkWinner(test).winner === 2) return i;
+    }
+    // 挡
+    for (const i of emptyIndices(board)) {
+      const test = board.slice();
+      test[i] = 1;
+      if (checkWinner(test) && checkWinner(test).winner === 1) return i;
+    }
+    // 占中心
+    if (board[4] === 0) return 4;
+    return randomMove();
+  }
+
+  // 无敌：极小化极大 + 记忆化
+  const memo = new Map();
+
+  function bestMove(b, player) {
+    const key = b.join('') + player;
+    if (memo.has(key)) return memo.get(key);
+
+    const res = checkWinner(b);
+    if (res) {
+      let score;
+      if (res.winner === 2) score = 10;        // AI 赢
+      else if (res.winner === 1) score = -10;  // 玩家赢
+      else score = 0;                          // 平
+      const result = { score, index: -1 };
+      memo.set(key, result);
+      return result;
+    }
+
+    const empty = emptyIndices(b);
+    let best = { score: player === 2 ? -Infinity : Infinity, index: -1 };
+
+    for (const i of empty) {
+      const next = b.slice();
+      next[i] = player;
+      const r = bestMove(next, player === 2 ? 1 : 2);
+      // 深度会让 AI 倾向于快速取胜 / 拖延失败
+      let score = r.score;
+      if (score > 0) score -= 1;      // AI 赢，越早越好
+      else if (score < 0) score += 1; // 玩家赢，越晚越好
+
+      if (player === 2) {
+        if (score > best.score) best = { score, index: i };
+      } else {
+        if (score < best.score) best = { score, index: i };
+      }
+    }
+
+    memo.set(key, best);
+    return best;
+  }
+
+  // ---------- 输入 ----------
+  function handleTap(e) {
+    if (gameEnd || !playerTurn || aiThinking) return;
+    const rect = boardCanvas.getBoundingClientRect();
+    let clientX, clientY;
+    if (e.changedTouches && e.changedTouches.length) {
+      clientX = e.changedTouches[0].clientX;
+      clientY = e.changedTouches[0].clientY;
+    } else if (e.touches && e.touches.length) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+    const px = (clientX - rect.left) / rect.width * boardCanvas.width;
+    const py = (clientY - rect.top) / rect.height * boardCanvas.height;
+    const c = Math.floor(px / cellSize);
+    const r = Math.floor(py / cellSize);
+    if (r < 0 || r > 2 || c < 0 || c > 2) return;
+    playerMove(r * 3 + c);
+  }
+
+  boardCanvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    touchUsed = true;
+    handleTap(e);
+  }, { passive: false });
+
+  boardCanvas.addEventListener('mousedown', (e) => {
+    if (touchUsed) return;
+    handleTap(e);
+  });
+  boardCanvas.addEventListener('mouseup', () => { touchUsed = false; });
+
+  // ---------- 先手/后手 ----------
+  function setFirst(v) {
+    playerFirst = v;
+    firstBtn.classList.toggle('active', v);
+    secondBtn.classList.toggle('active', !v);
+    initGame();
+  }
+  firstBtn.addEventListener('click', () => setFirst(true));
+  secondBtn.addEventListener('click', () => setFirst(false));
+  firstBtn.addEventListener('touchstart', (e) => { e.preventDefault(); setFirst(true); }, { passive: false });
+  secondBtn.addEventListener('touchstart', (e) => { e.preventDefault(); setFirst(false); }, { passive: false });
+
+  // ---------- 难度 ----------
+  function updateDiffLabel() {
+    const names = { easy: '简单', normal: '普通', hard: '无敌' };
+    diffBtn.textContent = '难度：' + names[difficulty];
+  }
+  function openDiff() {
+    diffOverlay.querySelectorAll('.level-btn[data-diff]').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.diff === difficulty);
+    });
+    diffOverlay.classList.remove('hidden');
+  }
+  diffBtn.addEventListener('click', openDiff);
+  diffBtn.addEventListener('touchstart', (e) => { e.preventDefault(); openDiff(); }, { passive: false });
+
+  diffOverlay.querySelectorAll('.level-btn[data-diff]').forEach(btn => {
+    const handler = (e) => {
+      e.preventDefault();
+      difficulty = btn.dataset.diff;
+      updateDiffLabel();
+      diffOverlay.classList.add('hidden');
+      initGame();
+    };
+    btn.addEventListener('click', handler);
+    btn.addEventListener('touchstart', handler, { passive: false });
+  });
+  diffClose.addEventListener('click', () => diffOverlay.classList.add('hidden'));
+  diffClose.addEventListener('touchstart', (e) => { e.preventDefault(); diffOverlay.classList.add('hidden'); }, { passive: false });
+
+  // ---------- 重开 ----------
+  resetBtn.addEventListener('click', initGame);
+  resetBtn.addEventListener('touchstart', (e) => { e.preventDefault(); initGame(); }, { passive: false });
+
+  window.addEventListener('resize', () => { computeCellSize(); draw(); });
+  window.addEventListener('orientationchange', () => { setTimeout(() => { computeCellSize(); draw(); }, 200); });
+
+  // 启动
+  setFirst(true);
+  updateDiffLabel();
+  initGame();
+})();
+</script>
+</body>
+</html>

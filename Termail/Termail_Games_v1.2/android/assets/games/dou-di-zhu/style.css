@@ -1,0 +1,113 @@
+* { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+html, body {
+  margin: 0; padding: 0; height: 100%;
+  background: #15171c;
+  font-family: Arial, "Microsoft YaHei", sans-serif;
+  overflow: hidden;
+}
+body { display: flex; justify-content: center; align-items: center; padding: 2px; }
+
+.game-container {
+  background: #1d2026;
+  border: 1px solid #333842;
+  padding: 4px;
+  display: flex; flex-direction: column;
+  width: 100%; height: 100%;
+  max-width: 800px;
+}
+
+.top-row { display: flex; justify-content: space-between; width: 100%; padding: 2px 10px; }
+.info-box { color: #d8d8d8; font-size: 14px; }
+.info-box span { color: #ffd966; font-weight: bold; }
+
+.table-wrap {
+  flex: 1; display: flex; flex-direction: column; justify-content: space-between;
+  position: relative; padding: 10px;
+}
+
+/* 底牌 */
+.bottom-cards { display: flex; justify-content: center; gap: 5px; height: 60px; margin-top: 5px; }
+
+/* 出牌区 */
+.play-area { flex: 1; display: flex; justify-content: center; align-items: center; position: relative; }
+.play-cards { display: flex; justify-content: center; gap: 2px; }
+
+/* AI 出牌区 */
+.ai-play-area {
+  position: absolute; top: 40%; transform: translateY(-50%);
+  display: flex; gap: 2px; min-height: 56px;
+}
+.ai-play-area.left { left: 20px; }
+.ai-play-area.right { right: 20px; }
+
+/* 提示文字 */
+.msg-box {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  color: #ff6f61; font-weight: bold; font-size: 24px;
+  text-shadow: 0 2px 4px #000; opacity: 0; transition: opacity 0.3s;
+  pointer-events: none; white-space: nowrap; z-index: 10;
+}
+.msg-box.show { opacity: 1; }
+
+/* 玩家手牌 */
+.hand-area {
+  width: 100%; height: 90px; display: flex; justify-content: center; align-items: flex-end;
+  padding-bottom: 5px; position: relative;
+}
+
+/* 扑克牌 */
+.card {
+  width: 55px; height: 78px; background: #fff; border-radius: 4px;
+  border: 1px solid #999; box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+  position: relative; display: flex; flex-direction: column;
+  padding: 2px 4px; font-weight: bold; font-size: 16px;
+  transition: transform 0.1s, margin 0.1s; cursor: pointer; flex-shrink: 0;
+}
+.card.small { width: 40px; height: 56px; font-size: 12px; padding: 2px; }
+.hand-area .card { margin-left: -28px; }
+.hand-area .card:first-child { margin-left: 0; }
+.card.red { color: #d32f2f; }
+.card.black { color: #111; }
+.card.selected {
+  transform: translateY(-20px);
+  box-shadow: 0 5px 10px rgba(0,0,0,0.8);
+  margin-left: -15px;
+}
+.card .suit { font-size: 22px; line-height: 1; }
+.card.small .suit { font-size: 16px; }
+.card.back {
+  background: repeating-linear-gradient(45deg, #b71c1c, #b71c1c 5px, #e53935 5px, #e53935 10px);
+  border: 1px solid #fff;
+}
+
+.touch-controls { width: 100%; display: flex; gap: 4px; padding: 5px; }
+.touch-btn {
+  flex: 1; background: #262a32; border: 1px solid #3a404b; color: #cfd4dc;
+  border-radius: 4px; font-size: 13px; padding: 12px 0; cursor: pointer; font-family: inherit;
+}
+.touch-btn:active { background: #313742; }
+.touch-btn:disabled { opacity: 0.3; }
+.touch-btn.primary { background: #2b3a4a; border-color: #3a4f6b; color: #b8cbe8; }
+
+/* 难度弹窗 */
+.overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.7);
+  display: flex; justify-content: center; align-items: center;
+  z-index: 10;
+}
+.overlay.hidden { display: none; }
+.panel {
+  background: #1d2026; border: 1px solid #3a404b; border-radius: 8px;
+  padding: 20px 24px; min-width: 250px; max-width: 90%;
+  color: #cfd4dc; font-size: 14px;
+}
+.panel h3 { margin: 0 0 16px; font-size: 16px; color: #e0e0e0; text-align: center; font-weight: normal; letter-spacing: 2px; }
+.level-btn {
+  display: block; width: 100%; margin-bottom: 8px;
+  background: #262a32; border: 1px solid #3a404b; color: #cfd4dc;
+  border-radius: 4px; padding: 11px 0; font-family: inherit; font-size: 14px; cursor: pointer;
+}
+.level-btn.active { background: #3a4f6b; border-color: #5a7aa0; color: #d8e6ff; }
+.level-btn:active { background: #313742; }
+.panel .close { margin-top: 12px; }

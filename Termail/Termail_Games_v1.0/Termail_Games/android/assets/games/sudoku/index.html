@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>数独</title>
+<style>
+  * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #15171c;
+    font-family: Arial, "Microsoft YaHei", sans-serif;
+    overflow: hidden;
+  }
+  body { display: flex; justify-content: center; align-items: center; padding: 6px; }
+
+  .game-container {
+    background: #1d2026;
+    border: 1px solid #333842;
+    padding: 8px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    width: 100%; height: 100%;
+    max-width: 460px;
+  }
+
+  .top-row { display: flex; gap: 6px; width: 100%; flex: 0 0 auto; }
+  .info-box {
+    flex: 1;
+    background: #14161a; border: 1px solid #333842;
+    padding: 4px 10px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .info-box .label { color: #6c7484; font-size: 12px; }
+  .info-box .value { color: #d8d8d8; font-size: 18px; font-weight: bold; }
+
+  .board-wrap {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+  }
+  canvas#board {
+    display: block;
+    background: #0d0f12;
+    border: 1px solid #333842;
+    touch-action: none;
+  }
+
+  .pad-wrap {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    flex: 0 0 auto;
+  }
+  .num-pad {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 5px;
+  }
+  .num-btn {
+    background: #262a32; border: 1px solid #3a404b; color: #cfd4dc;
+    border-radius: 4px; font-size: 18px; font-family: inherit;
+    padding: 12px 0; cursor: pointer;
+    position: relative;
+  }
+  .num-btn:active { background: #313742; }
+  .num-btn.used-up { color: #565e6d; }
+  .num-btn .left {
+    position: absolute; right: 4px; top: 2px;
+    font-size: 10px; color: #6c7484;
+  }
+  .num-btn.erase { color: #ff9a8a; font-size: 14px; }
+  .num-btn.notes-on { background: #3a4f6b; border-color: #5a7aa0; color: #d8e6ff; }
+
+  .control-row { display: flex; gap: 5px; }
+  .touch-btn {
+    flex: 1;
+    background: #262a32; border: 1px solid #3a404b; color: #cfd4dc;
+    border-radius: 4px; font-size: 14px; font-family: inherit;
+    padding: 10px 0; cursor: pointer;
+  }
+  .touch-btn:active { background: #313742; }
+  .touch-btn.active { background: #3a4f6b; border-color: #5a7aa0; color: #d8e6ff; }
+  .touch-btn.small { font-size: 12px; }
+
+  .hint {
+    text-align: center;
+    color: #6c7484;
+    font-size: 11px;
+    letter-spacing: 1px;
+    margin-top: 2px;
+  }
+
+  .overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.7);
+    display: flex; justify-content: center; align-items: center;
+    z-index: 10;
+  }
+  .overlay.hidden { display: none; }
+  .panel {
+    background: #1d2026; border: 1px solid #3a404b; border-radius: 8px;
+    padding: 20px 24px; min-width: 250px; max-width: 90%;
+    color: #cfd4dc; font-size: 14px;
+  }
+  .panel h3 { margin: 0 0 16px; font-size: 16px; color: #e0e0e0; text-align: center; font-weight: normal; letter-spacing: 2px; }
+  .level-btn {
+    display: block; width: 100%; margin-bottom: 8px;
+    background: #262a32; border: 1px solid #3a404b; color: #cfd4dc;
+    border-radius: 4px; padding: 11px 0; font-family: inherit; font-size: 14px; cursor: pointer;
+  }
+  .level-btn.active { background: #3a4f6b; border-color: #5a7aa0; color: #d8e6ff; }
+  .level-btn:active { background: #313742; }
+  .panel .close { margin-top: 12px; }
+</style>
+</head>
+<body>
+<div class="game-container">
+  <div class="top-row">
+    <div class="info-box">
+      <span class="label">难度</span>
+      <span class="value" id="diffDisplay" style="font-size:14px;">简单</span>
+    </div>
+    <div class="info-box">
+      <span class="label">用时</span>
+      <span class="value" id="timeDisplay">0</span>
+    </div>
+    <div class="info-box">
+      <span class="label">空格</span>
+      <span class="value" id="emptyDisplay">0</span>
+    </div>
+  </div>
+
+  <div class="board-wrap">
+    <canvas id="board"></canvas>
+  </div>
+
+  <div class="pad-wrap">
+    <div class="num-pad" id="numPad">
+      <button class="num-btn" data-num="1">1<span class="left" data-left="1"></span></button>
+      <button class="num-btn" data-num="2">2<span class="left" data-left="2"></span></button>
+      <button class="num-btn" data-num="3">3<span class="left" data-left="3"></span></button>
+      <button class="num-btn" data-num="4">4<span class="left" data-left="4"></span></button>
+      <button class="num-btn" data-num="5">5<span class="left" data-left="5"></span></button>
+      <button class="num-btn" data-num="6">6<span class="left" data-left="6"></span></button>
+      <button class="num-btn" data-num="7">7<span class="left" data-left="7"></span></button>
+      <button class="num-btn" data-num="8">8<span class="left" data-left="8"></span></button>
+      <button class="num-btn" data-num="9">9<span class="left" data-left="9"></span></button>
+      <button class="num-btn erase" id="eraseBtn">擦除</button>
+    </div>
+    <div class="control-row">
+      <button class="touch-btn" id="notesBtn">笔记：关</button>
+      <button class="touch-btn small" id="diffBtn">选难度</button>
+      <button class="touch-btn small" id="resetBtn">新题</button>
+    </div>
+    <div class="hint">点格子选中，再点数字填入</div>
+  </div>
+</div>
+
+<div class="overlay hidden" id="diffOverlay">
+  <div class="panel">
+    <h3>选择难度</h3>
+    <button class="level-btn" data-diff="easy">简单 · 挖空 35 格</button>
+    <button class="level-btn" data-diff="medium">中等 · 挖空 45 格</button>
+    <button class="level-btn" data-diff="hard">困难 · 挖空 52 格</button>
+    <button class="level-btn close" id="diffClose">取消</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  const boardCanvas = document.getElementById('board');
+  const ctx = boardCanvas.getContext('2d');
+  const wrap = boardCanvas.parentElement;
+  const diffDisplay = document.getElementById('diffDisplay');
+  const timeDisplay = document.getElementById('timeDisplay');
+  const emptyDisplay = document.getElementById('emptyDisplay');
+  const numPad = document.getElementById('numPad');
+  const notesBtn = document.getElementById('notesBtn');
+  const diffBtn = document.getElementById('diffBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const eraseBtn = document.getElementById('eraseBtn');
+  const diffOverlay = document.getElementById('diffOverlay');
+  const diffClose = document.getElementById('diffClose');
+
+  const DIFF = {
+    easy:   { holes: 35, name: '简单' },
+    medium: { holes: 45, name: '中等' },
+    hard:   { holes: 52, name: '困难' }
+  };
+  let diffKey = 'easy';
+  let diffCfg = DIFF.easy;
+
+  let solution;      // 完整解 9x9
+  let puzzle;        // 题目（0 表示空）
+  let grid;          // 当前玩家填的数字
+  let notes;         // 每格候选数 Set 的二维数组
+  let given;         // 是否是题目给定的（不可改）
+  let selected = { r: -1, c: -1 };
+  let notesMode = false;
+  let cellSize = 40;
+  let seconds = 0, timer = null;
+  let won = false;
+
+  // ---------- 生成器 ----------
+  // 生成完整解：回溯 + 随机
+  function generateSolution() {
+    const g = Array.from({length: 9}, () => Array(9).fill(0));
+    fillGrid(g);
+    return g;
+  }
+
+  function fillGrid(g) {
+    for (let r = 0; r < 9; r++) {
+      for (let c = 0; c < 9; c++) {
+        if (g[r][c] === 0) {
+          const nums = shuffle([1,2,3,4,5,6,7,8,9]);
+          for (const n of nums) {
+            if (isValid(g, r, c, n)) {
+              g[r][c] = n;
+              if (fillGrid(g)) return true;
+              g[r][c] = 0;
+            }
+          }
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  function isValid(g, r, c, n) {
+    for (let i = 0; i < 9; i++) {
+      if (g[r][i] === n || g[i][c] === n) return false;
+    }
+    const br = Math.floor(r / 3) * 3, bc = Math.floor(c / 3) * 3;
+    for (let i = 0; i < 3; i++)
+      for (let j = 0; j < 3; j++)
+        if (g[br + i][bc + j] === n) return false;
+    return true;
+  }
+
+  // 计算某格可填的数（用于求解计数）
+  function candidates(g, r, c) {
+    const used = new Set();
+    for (let i = 0; i < 9; i++) {
+      used.add(g[r][i]);
+      used.add(g[i][c]);
+    }
+    const br = Math.floor(r / 3) * 3, bc = Math.floor(c / 3) * 3;
+    for (let i = 0; i < 3; i++)
+      for (let j = 0; j < 3; j++)
+        used.add(g[br + i][bc + j]);
+    const res = [];
+    for (let n = 1; n <= 9; n++) if (!used.has(n)) res.push(n);
+    return res;
+  }
+
+  // 数解的数量（最多数到 limit 个就停）
+  function countSolutions(g, limit = 2) {
+    // 找候选最少的空格
+    let bestR = -1, bestC = -1, bestCands = null;
+    for (let r = 0; r < 9; r++) {
+      for (let c = 0; c < 9; c++) {
+        if (g[r][c] === 0) {
+          const cands = candidates(g, r, c);
+          if (cands.length === 0) return 0;
+          if (!bestCands || cands.length < bestCands.length) {
+            bestCands = cands;
+            bestR = r; bestC = c;
+            if (cands.length === 1) break;
+          }
+        }
+      }
+      if (bestCands && bestCands.length === 1) break;
+    }
+    if (!bestCands) return 1;   // 没有空格 = 一个解
+
+    let count = 0;
+    for (const n of bestCands) {
+      g[bestR][bestC] = n;
+      count += countSolutions(g, limit - count);
+      g[bestR][bestC] = 0;
+      if (count >= limit) break;
+    }
+    return count;
+  }
+
+  // 挖空生成题目
+  function makePuzzle(sol, holes) {
+    const p = sol.map(row => [...row]);
+    const positions = [];
+    for (let r = 0; r < 9; r++)
+      for (let c = 0; c < 9; c++)
+        positions.push([r, c]);
+    shuffle(positions);
+
+    let removed = 0;
+    for (const [r, c] of positions) {
+      if (removed >= holes) break;
+      const backup = p[r][c];
+      if (backup === 0) continue;
+      p[r][c] = 0;
+      // 校验唯一解
+      const test = p.map(row => [...row]);
+      if (countSolutions(test, 2) !== 1) {
+        p[r][c] = backup;   // 不唯一，恢复
+      } else {
+        removed++;
+      }
+    }
+    return p;
+  }
+
+  // ---------- 初始化 ----------
+  function initGame() {
+    if (timer) { clearInterval(timer); timer = null; }
+    solution = generateSolution();
+    puzzle = makePuzzle(solution, diffCfg.holes);
+    grid = puzzle.map(row => [...row]);
+    given = puzzle.map(row => row.map(v => v !== 0));
+    notes = Array.from({length: 9}, () => Array.from({length: 9}, () => new Set()));
+    selected = { r: -1, c: -1 };
+    notesMode = false;
+    notesBtn.textContent = '笔记：关';
+    notesBtn.classList.remove('active');
+    seconds = 0;
+    won = false;
+    updateUI();
+    computeCellSize();
+    draw();
+    requestAnimationFrame(() => { computeCellSize(); draw(); });
+  }
+
+  function computeCellSize() {
+    const maxW = wrap.clientWidth;
+    const maxH = wrap.clientHeight;
+    const availW = maxW > 0 ? maxW : Math.min(window.innerWidth - 30, 440);
+    const availH = maxH > 0 ? maxH : Math.min(window.innerHeight - 320, 440);
+    const s = Math.floor(Math.min(availW, availH) / 9);
+    cellSize = Math.max(28, s);
+    const cw = cellSize * 9, ch = cellSize * 9;
+    if (boardCanvas.width !== cw || boardCanvas.height !== ch) {
+      boardCanvas.width = cw;
+      boardCanvas.height = ch;
+    }
+    boardCanvas.style.width = cw + 'px';
+    boardCanvas.style.height = ch + 'px';
+  }
+
+  // ---------- 绘制 ----------
+  function draw() {
+    const W = boardCanvas.width, H = boardCanvas.height;
+    if (W === 0 || H === 0) return;
+
+    ctx.fillStyle = '#0d0f12';
+    ctx.fillRect(0, 0, W, H);
+
+    // 已填数字计数
+    const counts = Array(10).fill(0);
+    for (let r = 0; r < 9; r++)
+      for (let c = 0; c < 9; c++)
+        if (grid[r][c] > 0) counts[grid[r][c]]++;
+
+    // 高亮行列宫
+    const sr = selected.r, sc = selected.c;
+    for (let r = 0; r < 9; r++) {
+      for (let c = 0; c < 9; c++) {
+        const px = c * cellSize, py = r * cellSize;
+        let bg = '#0d0f12';
+
+        if (sr >= 0 && sc >= 0) {
+          const sameBox = (Math.floor(r/3) === Math.floor(sr/3) && Math.floor(c/3) === Math.floor(sc/3));
+          if (r === sr || c === sc || sameBox) bg = '#171b23';
+          if (r === sr && c === sc) bg = '#20303f';
+        }
+        // 相同数字高亮
+        if (sr >= 0 && sc >= 0 && grid[sr][sc] > 0 && grid[r][c] === grid[sr][sc] && !(r === sr && c === sc)) {
+          bg = '#2a2f3a';
+        }
+
+        ctx.fillStyle = bg;
+        ctx.fillRect(px, py, cellSize, cellSize);
+
+        // 数字
+        const val = grid[r][c];
+        const isGiven = given[r][c];
+        if (val > 0) {
+          if (isGiven) {
+            ctx.fillStyle = '#cfd4dc';
+          } else if (val === solution[r][c]) {
+            ctx.fillStyle = '#5d9df9';   // 玩家填对了，蓝色
+          } else {
+            ctx.fillStyle = '#ff6f61';   // 填错了，红色
+          }
+          ctx.font = 'bold ' + Math.floor(cellSize * 0.58) + 'px Arial, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(String(val), px + cellSize/2, py + cellSize/2 + 1);
+        } else if (notes[r][c].size > 0) {
+          // 候选数小字
+          const fs = Math.floor(cellSize * 0.24);
+          ctx.font = fs + 'px Arial, sans-serif';
+          ctx.fillStyle = '#7e8a9e';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          for (const n of notes[r][c]) {
+            const nr = Math.floor((n - 1) / 3), nc = (n - 1) % 3;
+            const nx = px + (nc + 0.5) * cellSize / 3;
+            const ny = py + (nr + 0.5) * cellSize / 3;
+            ctx.fillText(String(n), nx, ny);
+          }
+        }
+      }
+    }
+
+    // 网格线
+    for (let i = 0; i <= 9; i++) {
+      ctx.beginPath();
+      ctx.strokeStyle = (i % 3 === 0) ? '#6c7484' : '#2a2f3c';
+      ctx.lineWidth = (i % 3 === 0) ? 2 : 1;
+      ctx.moveTo(i * cellSize, 0);
+      ctx.lineTo(i * cellSize, H);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0, i * cellSize);
+      ctx.lineTo(W, i * cellSize);
+      ctx.stroke();
+    }
+
+    // 完成
+    if (won) {
+      ctx.fillStyle = 'rgba(0,0,0,.72)';
+      ctx.fillRect(0, 0, W, H);
+      ctx.font = 'bold ' + Math.floor(Math.min(W, H) * 0.11) + 'px Arial, sans-serif';
+      ctx.fillStyle = '#7ee0a0';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('完成！', W/2, H/2);
+    }
+  }
+
+  function updateUI() {
+    let empty = 0;
+    for (let r = 0; r < 9; r++)
+      for (let c = 0; c < 9; c++)
+        if (grid[r][c] === 0) empty++;
+    emptyDisplay.textContent = empty;
+    diffDisplay.textContent = diffCfg.name;
+    timeDisplay.textContent = seconds;
+
+    // 数字键盘剩余可填数
+    const counts = Array(10).fill(0);
+    for (let r = 0; r < 9; r++)
+      for (let c = 0; c < 9; c++)
+        if (grid[r][c] > 0) counts[grid[r][c]]++;
+    for (let n = 1; n <= 9; n++) {
+      const btn = numPad.querySelector(`[data-num="${n}"]`);
+      const leftSpan = btn.querySelector('.left');
+      const left = 9 - counts[n];
+      leftSpan.textContent = left > 0 ? left : '';
+      btn.classList.toggle('used-up', left <= 0);
+    }
+  }
+
+  function startTimer() {
+    if (timer) clearInterval(timer);
+    timer = setInterval(() => {
+      if (!won) { seconds++; timeDisplay.textContent = seconds; }
+    }, 1000);
+  }
+
+  // ---------- 交互 ----------
+  let touchUsed = false;
+
+  function getCellFromEvent(e) {
+    const rect = boardCanvas.getBoundingClientRect();
+    let clientX, clientY;
+    if (e.changedTouches && e.changedTouches.length) {
+      clientX = e.changedTouches[0].clientX;
+      clientY = e.changedTouches[0].clientY;
+    } else if (e.touches && e.touches.length) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+    const c = Math.floor((clientX - rect.left) / rect.width * 9);
+    const r = Math.floor((clientY - rect.top) / rect.height * 9);
+    if (r < 0 || r >= 9 || c < 0 || c >= 9) return null;
+    return {r, c};
+  }
+
+  function handleBoardTap(e) {
+    if (won) return;
+    const pos = getCellFromEvent(e);
+    if (!pos) return;
+    selected = pos;
+    draw();
+  }
+
+  boardCanvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    touchUsed = true;
+    handleBoardTap(e);
+  }, { passive: false });
+
+  boardCanvas.addEventListener('mousedown', (e) => {
+    if (touchUsed) return;
+    handleBoardTap(e);
+  });
+  boardCanvas.addEventListener('mouseup', () => { touchUsed = false; });
+
+  // 数字按钮
+  function inputNumber(n) {
+    if (won) return;
+    const {r, c} = selected;
+    if (r < 0 || c < 0) return;
+    if (given[r][c]) return;   // 题目给定，不可改
+
+    if (timer === null && seconds === 0) startTimer();
+
+    if (notesMode) {
+      if (grid[r][c] !== 0) return;  // 已有数字不记候选
+      if (notes[r][c].has(n)) notes[r][c].delete(n);
+      else notes[r][c].add(n);
+    } else {
+      if (grid[r][c] === n) {
+        grid[r][c] = 0;   // 再点一次取消
+      } else {
+        grid[r][c] = n;
+        notes[r][c].clear();
+        // 清除同行列宫的该候选数
+        for (let i = 0; i < 9; i++) {
+          notes[r][i].delete(n);
+          notes[i][c].delete(n);
+        }
+        const br = Math.floor(r/3)*3, bc = Math.floor(c/3)*3;
+        for (let i = 0; i < 3; i++)
+          for (let j = 0; j < 3; j++)
+            notes[br+i][bc+j].delete(n);
+      }
+    }
+    updateUI();
+    draw();
+    checkWin();
+  }
+
+  numPad.querySelectorAll('[data-num]').forEach(btn => {
+    const n = parseInt(btn.dataset.num, 10);
+    const handler = (e) => { e.preventDefault(); inputNumber(n); };
+    btn.addEventListener('click', handler);
+    btn.addEventListener('touchstart', handler, { passive: false });
+  });
+
+  eraseBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (won) return;
+    const {r, c} = selected;
+    if (r < 0 || c < 0 || given[r][c]) return;
+    grid[r][c] = 0;
+    notes[r][c].clear();
+    updateUI();
+    draw();
+  });
+  eraseBtn.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    if (won) return;
+    const {r, c} = selected;
+    if (r < 0 || c < 0 || given[r][c]) return;
+    grid[r][c] = 0;
+    notes[r][c].clear();
+    updateUI();
+    draw();
+  }, { passive: false });
+
+  function toggleNotes() {
+    notesMode = !notesMode;
+    notesBtn.textContent = '笔记：' + (notesMode ? '开' : '关');
+    notesBtn.classList.toggle('active', notesMode);
+  }
+  notesBtn.addEventListener('click', toggleNotes);
+  notesBtn.addEventListener('touchstart', (e) => { e.preventDefault(); toggleNotes(); }, { passive: false });
+
+  function checkWin() {
+    for (let r = 0; r < 9; r++)
+      for (let c = 0; c < 9; c++)
+        if (grid[r][c] !== solution[r][c]) return false;
+    won = true;
+    if (timer) { clearInterval(timer); timer = null; }
+    draw();
+    return true;
+  }
+
+  // 按钮
+  resetBtn.addEventListener('click', initGame);
+  resetBtn.addEventListener('touchstart', (e) => { e.preventDefault(); initGame(); }, { passive: false });
+
+  function openDiff() {
+    diffOverlay.querySelectorAll('.level-btn[data-diff]').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.diff === diffKey);
+    });
+    diffOverlay.classList.remove('hidden');
+  }
+  diffBtn.addEventListener('click', openDiff);
+  diffBtn.addEventListener('touchstart', (e) => { e.preventDefault(); openDiff(); }, { passive: false });
+
+  diffOverlay.querySelectorAll('.level-btn[data-diff]').forEach(btn => {
+    const handler = (e) => {
+      e.preventDefault();
+      diffKey = btn.dataset.diff;
+      diffCfg = DIFF[diffKey];
+      diffOverlay.classList.add('hidden');
+      initGame();
+    };
+    btn.addEventListener('click', handler);
+    btn.addEventListener('touchstart', handler, { passive: false });
+  });
+  diffClose.addEventListener('click', () => diffOverlay.classList.add('hidden'));
+  diffClose.addEventListener('touchstart', (e) => { e.preventDefault(); diffOverlay.classList.add('hidden'); }, { passive: false });
+
+  window.addEventListener('resize', () => { computeCellSize(); draw(); });
+  window.addEventListener('orientationchange', () => { setTimeout(() => { computeCellSize(); draw(); }, 200); });
+
+  initGame();
+})();
+</script>
+</body>
+</html>

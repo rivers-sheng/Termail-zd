@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>烟花</title>
+<style>
+  * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #05070a;
+    font-family: Arial, "Microsoft YaHei", sans-serif;
+    overflow: hidden;
+  }
+  body { display: flex; justify-content: center; align-items: center; }
+
+  .game-container {
+    background: #0a0d12;
+    border: 1px solid #1a1f2a;
+    padding: 0;
+    display: flex; flex-direction: column; align-items: center;
+    width: 100%; height: 100%;
+    max-width: 460px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  canvas#board {
+    display: block;
+    background: #05070a;
+    touch-action: none;
+    width: 100%;
+    height: 100%;
+  }
+
+  .hint {
+    position: absolute;
+    bottom: 20px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    color: rgba(255,255,255,.25);
+    font-size: 12px;
+    letter-spacing: 2px;
+    pointer-events: none;
+    transition: opacity 1s;
+  }
+
+  .hint.hide { opacity: 0; }
+
+  .count {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    color: rgba(255,255,255,.15);
+    font-size: 12px;
+    letter-spacing: 1px;
+    pointer-events: none;
+  }
+
+  .controls {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    display: flex;
+    gap: 6px;
+  }
+
+  .ctrl-btn {
+    background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.15);
+    color: rgba(255,255,255,.6);
+    border-radius: 4px;
+    font-size: 12px;
+    font-family: inherit;
+    padding: 5px 10px;
+    cursor: pointer;
+    letter-spacing: 1px;
+  }
+  .ctrl-btn:active { background: rgba(255,255,255,.15); }
+</style>
+</head>
+<body>
+<div class="game-container">
+  <canvas id="board"></canvas>
+  <div class="controls">
+    <button class="ctrl-btn" id="autoBtn">自动放</button>
+    <button class="ctrl-btn" id="clearBtn">清空</button>
+  </div>
+  <div class="count" id="countDisplay"></div>
+  <div class="hint" id="hint">点击屏幕放烟花</div>
+</div>
+
+<script>
+(function() {
+  const canvas = document.getElementById('board');
+  const ctx = canvas.getContext('2d');
+  const wrap = canvas.parentElement;
+  const hintEl = document.getElementById('hint');
+  const countDisplay = document.getElementById('countDisplay');
+  const autoBtn = document.getElementById('autoBtn');
+  const clearBtn = document.getElementById('clearBtn');
+
+  let W = 0, H = 0;
+  let dpr = window.devicePixelRatio || 1;
+
+  // 粒子
+  let particles = [];       // 所有正在飞的粒子
+  let rockets = [];         // 上升的火箭（可选，这里直接开花）
+  let flashes = [];         // 爆炸瞬间的闪光
+  let stars = [];           // 背景星星
+
+  let autoMode = false;
+  let autoTimer = null;
+
+  // 烟花配色
+  const PALETTES = [
+    ['#ff6f61', '#ffd966', '#ff9a8a'],
+    ['#5d9df9', '#3ec1d3', '#b8e0ff'],
+    ['#b286fe', '#e0c8ff', '#ff8fab'],
+    ['#5cdb95', '#a0f0c0', '#d0ffe0'],
+    ['#f6d365', '#ffb347', '#fff2b0'],
+    ['#ff8fab', '#ffc0cb', '#ffffff'],
+    ['#3ec1d3', '#7ee0a0', '#ffffff'],
+  ];
+
+  function resize() {
+    const rect = wrap.getBoundingClientRect();
+    W = rect.width;
+    H = rect.height;
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    // 重新生成星星
+    initStars();
+  }
+
+  function initStars() {
+    stars = [];
+    const n = Math.floor(W * H / 4000);
+    for (let i = 0; i < n; i++) {
+      stars.push({
+        x: Math.random() * W,
+        y: Math.random() * H,
+        r: Math.random() * 1.2 + 0.3,
+        a: Math.random() * 0.6 + 0.1,
+        twinkle: Math.random() * Math.PI * 2,
+        speed: 0.005 + Math.random() * 0.01
+      });
+    }
+  }
+
+  // 放一朵烟花
+  function launch(x, y) {
+    const palette = PALETTES[Math.floor(Math.random() * PALETTES.length)];
+    // 闪光
+    flashes.push({
+      x, y,
+      r: 0,
+      maxR: 80 + Math.random() * 60,
+      life: 1,
+      color: palette[0]
+    });
+
+    // 粒子数量
+    const count = 50 + Math.floor(Math.random() * 40);
+    // 爆炸速度
+    const speed = 2 + Math.random() * 2;
+
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
+      const v = speed * (0.4 + Math.random() * 0.6);
+      const color = palette[Math.floor(Math.random() * palette.length)];
+      particles.push({
+        x, y,
+        vx: Math.cos(angle) * v,
+        vy: Math.sin(angle) * v,
+        r: 1 + Math.random() * 2,
+        color,
+        life: 1,
+        decay: 0.006 + Math.random() * 0.008,
+        gravity: 0.02 + Math.random() * 0.02,
+        trail: []   // 拖尾
+      });
+    }
+
+    // 隐藏提示
+    if (!hintEl.classList.contains('hide')) {
+      hintEl.classList.add('hide');
+    }
+    updateCount();
+  }
+
+  function updateCount() {
+    countDisplay.textContent = particles.length > 0 ? particles.length + ' 粒子' : '';
+  }
+
+  // 动画循环
+  let lastTime = 0;
+  function loop(now) {
+    requestAnimationFrame(loop);
+    if (!lastTime) lastTime = now;
+    let dt = Math.min(50, now - lastTime) / 16.67;   // 归一化到 60fps
+    lastTime = now;
+
+    update(dt);
+    render();
+  }
+
+  function update(dt) {
+    // 粒子
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+
+      // 拖尾记录
+      p.trail.push({ x: p.x, y: p.y });
+      if (p.trail.length > 6) p.trail.shift();
+
+      // 物理
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vy += p.gravity * dt;
+      // 空气阻力
+      p.vx *= 0.985;
+      p.vy *= 0.985;
+
+      p.life -= p.decay * dt;
+
+      if (p.life <= 0) {
+        particles.splice(i, 1);
+      }
+    }
+
+    // 闪光
+    for (let i = flashes.length - 1; i >= 0; i--) {
+      const f = flashes[i];
+      f.r += (f.maxR - f.r) * 0.15 * dt;
+      f.life -= 0.05 * dt;
+      if (f.life <= 0) flashes.splice(i, 1);
+    }
+
+    // 星星闪烁
+    for (const s of stars) {
+      s.twinkle += s.speed * dt;
+    }
+
+    updateCount();
+  }
+
+  function render() {
+    // 背景（半透明黑，产生拖尾效果）
+    ctx.fillStyle = 'rgba(5, 7, 10, 0.25)';
+    ctx.fillRect(0, 0, W, H);
+
+    // 星星
+    for (const s of stars) {
+      const a = s.a * (0.5 + 0.5 * Math.sin(s.twinkle));
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,255,255,' + a + ')';
+      ctx.fill();
+    }
+
+    // 闪光
+    ctx.globalCompositeOperation = 'lighter';
+    for (const f of flashes) {
+      const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, f.r);
+      g.addColorStop(0, 'rgba(255,255,255,' + (f.life * 0.8) + ')');
+      g.addColorStop(0.3, hexToRgba(f.color, f.life * 0.5));
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 粒子（用 lighter 混合，发光感）
+    for (const p of particles) {
+      const alpha = Math.max(0, p.life);
+      // 拖尾
+      if (p.trail.length > 1) {
+        for (let i = 0; i < p.trail.length; i++) {
+          const t = p.trail[i];
+          const ta = alpha * (i / p.trail.length) * 0.4;
+          ctx.beginPath();
+          ctx.arc(t.x, t.y, p.r * (i / p.trail.length), 0, Math.PI * 2);
+          ctx.fillStyle = hexToRgba(p.color, ta);
+          ctx.fill();
+        }
+      }
+      // 粒子本身
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r * (0.5 + alpha * 0.5), 0, Math.PI * 2);
+      ctx.fillStyle = hexToRgba(p.color, alpha);
+      ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // hex -> rgba
+  function hexToRgba(hex, a) {
+    if (!hex) return 'rgba(255,255,255,' + a + ')';
+    let c = hex.replace('#', '');
+    if (c.length === 3) c = c.split('').map(x => x + x).join('');
+    const r = parseInt(c.substr(0, 2), 16);
+    const g = parseInt(c.substr(2, 2), 16);
+    const b = parseInt(c.substr(4, 2), 16);
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
+  }
+
+  // ---------- 输入 ----------
+  function getXY(e) {
+    const rect = canvas.getBoundingClientRect();
+    let clientX, clientY;
+    if (e.changedTouches && e.changedTouches.length) {
+      clientX = e.changedTouches[0].clientX;
+      clientY = e.changedTouches[0].clientY;
+    } else if (e.touches && e.touches.length) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+    return {
+      x: clientX - rect.left,
+      y: clientY - rect.top
+    };
+  }
+
+  function onTap(e) {
+    e.preventDefault();
+    const p = getXY(e);
+    launch(p.x, p.y);
+  }
+
+  canvas.addEventListener('touchstart', onTap, { passive: false });
+  canvas.addEventListener('mousedown', onTap);
+
+  // 自动模式
+  autoBtn.addEventListener('click', () => {
+    autoMode = !autoMode;
+    autoBtn.textContent = autoMode ? '停止自动' : '自动放';
+    autoBtn.style.color = autoMode ? '#7ee0a0' : '';
+    if (autoMode) {
+      autoTimer = setInterval(() => {
+        if (document.hidden) return;
+        launch(Math.random() * W * 0.8 + W * 0.1, Math.random() * H * 0.6 + H * 0.1);
+      }, 600);
+    } else {
+      if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+    }
+  });
+
+  clearBtn.addEventListener('click', () => {
+    particles = [];
+    flashes = [];
+    updateCount();
+  });
+
+  // 初始化
+  window.addEventListener('resize', resize);
+  window.addEventListener('orientationchange', () => { setTimeout(resize, 200); });
+
+  resize();
+  // 开始时放一朵，吸引注意
+  setTimeout(() => launch(W / 2, H * 0.4), 500);
+
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

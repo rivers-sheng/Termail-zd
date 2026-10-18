@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>切水果</title>
+<style>
+  * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #15171c;
+    font-family: Arial, "Microsoft YaHei", sans-serif;
+    overflow: hidden;
+  }
+  body { display: flex; justify-content: center; align-items: center; padding: 6px; }
+
+  .game-container {
+    background: #1d2026;
+    border: 1px solid #333842;
+    padding: 8px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    width: 100%; height: 100%;
+    max-width: 460px;
+  }
+
+  .top-row { display: flex; gap: 6px; width: 100%; flex: 0 0 auto; }
+  .info-box {
+    flex: 1;
+    background: #14161a; border: 1px solid #333842;
+    padding: 4px 8px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .info-box .label { color: #6c7484; font-size: 11px; }
+  .info-box .value { color: #d8d8d8; font-size: 16px; font-weight: bold; }
+  .info-box .value.best { color: #f6d365; }
+  .info-box .value.life { color: #ff6f61; }
+
+  .board-wrap {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+  }
+  canvas#board {
+    display: block;
+    background: #1a1e26;
+    border: 1px solid #333842;
+    border-radius: 4px;
+    touch-action: none;
+  }
+
+  .status {
+    text-align: center;
+    color: #b7c0d0;
+    font-size: 14px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    min-height: 20px;
+    flex: 0 0 auto;
+  }
+
+  .touch-controls { width: 100%; display: flex; gap: 5px; flex: 0 0 auto; }
+  .touch-btn {
+    flex: 1;
+    background: #262a32; border: 1px solid #3a404b; color: #cfd4dc;
+    border-radius: 4px; font-size: 14px; font-family: inherit;
+    padding: 11px 0; cursor: pointer;
+  }
+  .touch-btn:active { background: #313742; }
+  .touch-btn.active { background: #3a4f6b; border-color: #5a7aa0; color: #d8e6ff; }
+
+  .hint {
+    text-align: center;
+    color: #6c7484;
+    font-size: 11px;
+    letter-spacing: 1px;
+    margin-top: 2px;
+  }
+
+  .overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.75);
+    display: flex; justify-content: center; align-items: center;
+    z-index: 10;
+  }
+  .overlay.hidden { display: none; }
+  .panel {
+    background: #1d2026; border: 1px solid #3a404b; border-radius: 8px;
+    padding: 22px 26px; min-width: 260px; max-width: 90%;
+    color: #cfd4dc; font-size: 14px; text-align: center;
+  }
+  .panel h3 { margin: 0 0 16px; font-size: 17px; color: #e0e0e0; font-weight: normal; letter-spacing: 2px; }
+  .panel .big { font-size: 32px; font-weight: bold; color: #7ee0a0; margin: 8px 0 4px; }
+  .panel .sub { color: #8a94a6; font-size: 13px; margin-bottom: 18px; }
+  .panel button {
+    width: 100%; padding: 11px 0; margin-top: 8px;
+    background: #262a32; border: 1px solid #3a404b;
+    color: #cfd4dc; border-radius: 4px; font-family: inherit; font-size: 14px; cursor: pointer;
+  }
+  .panel button.primary { background: #2b3a4a; border-color: #3a4f6b; color: #b8cbe8; }
+  .panel button:active { background: #313742; }
+</style>
+</head>
+<body>
+<div class="game-container">
+  <div class="top-row">
+    <div class="info-box">
+      <span class="label">分数</span>
+      <span class="value" id="scoreDisplay">0</span>
+    </div>
+    <div class="info-box">
+      <span class="label">最高</span>
+      <span class="value best" id="bestDisplay">0</span>
+    </div>
+    <div class="info-box">
+      <span class="label">生命</span>
+      <span class="value life" id="lifeDisplay">3</span>
+    </div>
+  </div>
+
+  <div class="board-wrap">
+    <canvas id="board"></canvas>
+  </div>
+
+  <div class="status" id="statusText">划过水果切开它，别切炸弹</div>
+
+  <div class="touch-controls">
+    <div class="touch-btn" style="display:flex;gap:5px;flex:1;">
+      <button class="touch-btn" id="pauseBtn" style="flex:1;">暂停</button>
+      <button class="touch-btn" id="resetBtn" style="flex:1;">重开</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay hidden" id="overOverlay">
+  <div class="panel">
+    <h3>游戏结束</h3>
+    <div class="big" id="finalScore">0</div>
+    <div class="sub" id="finalBest">最高 0</div>
+    <button class="primary" id="overRestart">再来一次</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  const canvas = document.getElementById('board');
+  const ctx = canvas.getContext('2d');
+  const wrap = canvas.parentElement;
+  const scoreDisplay = document.getElementById('scoreDisplay');
+  const bestDisplay = document.getElementById('bestDisplay');
+  const lifeDisplay = document.getElementById('lifeDisplay');
+  const statusText = document.getElementById('statusText');
+  const pauseBtn = document.getElementById('pauseBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const overOverlay = document.getElementById('overOverlay');
+  const finalScore = document.getElementById('finalScore');
+  const finalBest = document.getElementById('finalBest');
+  const overRestart = document.getElementById('overRestart');
+
+  const W = 400, H = 600;
+  const GRAVITY = 0.28;      // 重力（调小，飞得高）
+  const HIT_SCALE = 1.2;     // 切中判定放宽
+
+  let items = [];
+  let particles = [];
+  let score = 0, best = 0, lives = 3;
+  let gameEnd = false;
+  let paused = false;
+  let spawnTimer = 0;
+  let spawnInterval = 1000;
+  let spawnCount = 0;
+  let running = false;
+
+  let blade = [];
+  let bladeActive = false;
+
+  let rafId = null;
+  let lastTime = 0;
+
+  try { best = parseInt(localStorage.getItem('fruit_best') || '0', 10); } catch(e) { best = 0; }
+  if (isNaN(best)) best = 0;
+
+  const FRUIT_TYPES = [
+    { color: '#ff6f61', inner: '#ffaaaa', score: 10, r: 30 },
+    { color: '#f6d365', inner: '#fff2b0', score: 12, r: 26 },
+    { color: '#5cdb95', inner: '#c0f0d0', score: 12, r: 28 },
+    { color: '#f9a26c', inner: '#ffd4b0', score: 15, r: 26 },
+    { color: '#b286fe', inner: '#e0c8ff', score: 15, r: 24 },
+  ];
+
+  function initGame() {
+    cancelAnimationFrame(rafId);
+    rafId = null;
+
+    items = [];
+    particles = [];
+    blade = [];
+    score = 0;
+    lives = 3;
+    gameEnd = false;
+    paused = false;
+    running = true;
+    spawnTimer = 0;
+    spawnInterval = 1000;
+    spawnCount = 0;
+
+    pauseBtn.textContent = '暂停';
+    pauseBtn.classList.remove('active');
+    overOverlay.classList.add('hidden');
+    updateUI();
+    resizeCanvas();
+    draw();
+    lastTime = 0;
+    rafId = requestAnimationFrame(loop);
+    requestAnimationFrame(() => { resizeCanvas(); draw(); });
+  }
+
+  function resizeCanvas() {
+    const maxW = wrap.clientWidth;
+    const maxH = wrap.clientHeight;
+    const availW = maxW > 0 ? maxW : Math.min(window.innerWidth - 30, 440);
+    const availH = maxH > 0 ? maxH : Math.min(window.innerHeight - 200, 620);
+    const scale = Math.min(availW / W, availH / H);
+    const cw = Math.max(220, Math.floor(W * scale));
+    const ch = Math.max(330, Math.floor(H * scale));
+    if (canvas.width !== W || canvas.height !== H) {
+      canvas.width = W;
+      canvas.height = H;
+    }
+    canvas.style.width = cw + 'px';
+    canvas.style.height = ch + 'px';
+  }
+
+  function updateUI() {
+    scoreDisplay.textContent = score;
+    bestDisplay.textContent = best;
+    lifeDisplay.textContent = lives;
+  }
+
+  function loop(now) {
+    rafId = requestAnimationFrame(loop);
+    if (!lastTime) lastTime = now;
+    let dt = now - lastTime;
+    lastTime = now;
+    if (dt > 50) dt = 50;
+
+    if (running && !gameEnd && !paused) update(dt);
+    draw();
+  }
+
+  function update(dt) {
+    // 生成
+    spawnTimer += dt;
+    if (spawnTimer >= spawnInterval) {
+      spawnTimer = 0;
+      spawnFruit();
+    }
+
+    // 物品
+    for (let i = items.length - 1; i >= 0; i--) {
+      const it = items[i];
+      it.vy += GRAVITY * dt / 16.67;
+      it.x += it.vx * dt / 16.67;
+      it.y += it.vy * dt / 16.67;
+      it.angle += it.va * dt / 16.67;
+
+      if (it.y - it.r > H + 80) {
+        items.splice(i, 1);
+      }
+    }
+
+    // 碎片
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.vy += GRAVITY * 0.8 * dt / 16.67;
+      p.x += p.vx * dt / 16.67;
+      p.y += p.vy * dt / 16.67;
+      p.life -= dt;
+      if (p.life <= 0 || p.y > H + 80) particles.splice(i, 1);
+    }
+
+    // 刀锋淡出
+    const now = performance.now();
+    blade = blade.filter(b => now - b.time < 180);
+  }
+
+  function spawnFruit() {
+    // 随分数增加每次生成的数量
+    const level = Math.floor(score / 100);
+    let n = 1 + Math.floor(Math.random() * 2);
+    if (level >= 1 && Math.random() < 0.4) n = 2 + Math.floor(Math.random() * 2);
+    if (level >= 3) n = Math.min(4, n + 1);
+
+    for (let i = 0; i < n; i++) {
+      // 稍微错开生成时间（同一帧多个位置不同）
+      const isBomb = Math.random() < 0.15;
+      let type, color, inner, r, sc;
+      if (isBomb) {
+        type = 'bomb';
+        color = '#2a2f3a';
+        inner = '#11141a';
+        r = 28;
+        sc = 0;
+      } else {
+        type = 'fruit';
+        const ft = FRUIT_TYPES[Math.floor(Math.random() * FRUIT_TYPES.length)];
+        color = ft.color;
+        inner = ft.inner;
+        r = ft.r;
+        sc = ft.score;
+      }
+
+      const x = 60 + Math.random() * (W - 120);
+      const y = H + r + 20 + i * 30;
+      // 抛得更高
+      const vy = -(13 + Math.random() * 3);
+      const vx = (Math.random() - 0.5) * 4.5;
+
+      items.push({
+        x, y, vx, vy, r,
+        type, color, inner,
+        score: sc,
+        sliced: false,
+        angle: 0,
+        va: (Math.random() - 0.5) * 0.1
+      });
+    }
+
+    spawnCount++;
+    if (spawnCount % 4 === 0 && spawnInterval > 450) {
+      spawnInterval -= 70;
+    }
+  }
+
+  function slice(x, y) {
+    // 放宽判定：多检测几个点
+    for (const it of items) {
+      if (it.sliced) continue;
+      const dx = x - it.x;
+      const dy = y - it.y;
+      if (dx * dx + dy * dy < (it.r * HIT_SCALE) * (it.r * HIT_SCALE)) {
+        it.sliced = true;
+        if (it.type === 'bomb') {
+          // 炸弹
+          lives--;
+          updateUI();
+          for (let k = 0; k < 25; k++) {
+            particles.push({
+              x: it.x, y: it.y,
+              vx: (Math.random() - 0.5) * 14,
+              vy: (Math.random() - 0.5) * 14,
+              r: 3 + Math.random() * 5,
+              color: k % 2 ? '#ff6f61' : '#ffd966',
+              life: 700
+            });
+          }
+          items.splice(items.indexOf(it), 1);
+          if (lives <= 0) {
+            gameOver();
+            return;
+          }
+        } else {
+          // 水果
+          score += it.score;
+          if (score > best) {
+            best = score;
+            try { localStorage.setItem('fruit_best', String(best)); } catch(e) {}
+          }
+          updateUI();
+          for (let k = 0; k < 14; k++) {
+            particles.push({
+              x: it.x, y: it.y,
+              vx: (Math.random() - 0.5) * 10,
+              vy: (Math.random() - 0.5) * 10 - 2,
+              r: 3 + Math.random() * 5,
+              color: it.color,
+              life: 500 + Math.random() * 400
+            });
+          }
+          items.splice(items.indexOf(it), 1);
+        }
+        return;
+      }
+    }
+  }
+
+  function gameOver() {
+    gameEnd = true;
+    running = false;
+    if (score > best) {
+      best = score;
+      try { localStorage.setItem('fruit_best', String(best)); } catch(e) {}
+    }
+    updateUI();
+    finalScore.textContent = score;
+    finalBest.textContent = '最高 ' + best;
+    overOverlay.classList.remove('hidden');
+  }
+
+  // ---------- 绘制 ----------
+  function draw() {
+    const cw = canvas.width, ch = canvas.height;
+    if (cw === 0 || ch === 0) return;
+
+    // 背景
+    const g = ctx.createLinearGradient(0, 0, 0, ch);
+    g.addColorStop(0, '#1a1e26');
+    g.addColorStop(1, '#0f1219');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, cw, ch);
+
+    // 背景装饰（淡淡的竖纹）
+    ctx.strokeStyle = 'rgba(255,255,255,.02)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < cw; x += 40) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, ch);
+      ctx.stroke();
+    }
+
+    // 物品
+    for (const it of items) {
+      ctx.save();
+      ctx.translate(it.x, it.y);
+      ctx.rotate(it.angle);
+      if (it.type === 'bomb') drawBomb(it);
+      else drawFruit(it);
+      ctx.restore();
+    }
+
+    // 碎片
+    for (const p of particles) {
+      ctx.globalAlpha = Math.min(1, p.life / 300);
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // 刀锋轨迹
+    if (blade.length > 1) {
+      const now = performance.now();
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      // 外层光晕
+      ctx.strokeStyle = 'rgba(255,255,255,.2)';
+      ctx.lineWidth = 12;
+      ctx.beginPath();
+      for (let i = 0; i < blade.length; i++) {
+        const b = blade[i];
+        if (i === 0) ctx.moveTo(b.x, b.y);
+        else ctx.lineTo(b.x, b.y);
+      }
+      ctx.stroke();
+      // 内层白线
+      ctx.strokeStyle = 'rgba(255,255,255,.9)';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      for (let i = 0; i < blade.length; i++) {
+        const b = blade[i];
+        if (i === 0) ctx.moveTo(b.x, b.y);
+        else ctx.lineTo(b.x, b.y);
+      }
+      ctx.stroke();
+    }
+
+    // 暂停遮罩
+    if (paused) {
+      ctx.fillStyle = 'rgba(0,0,0,.6)';
+      ctx.fillRect(0, 0, cw, ch);
+      ctx.font = 'bold ' + Math.floor(Math.min(cw, ch) * 0.12) + 'px Arial, sans-serif';
+      ctx.fillStyle = '#d0d0d0';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('暂停', cw / 2, ch / 2);
+    }
+  }
+
+  function drawFruit(it) {
+    ctx.beginPath();
+    ctx.arc(2, 2, it.r, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0,0,0,.3)';
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(0, 0, it.r, 0, Math.PI * 2);
+    ctx.fillStyle = it.color;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,.3)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // 内圈（果肉）
+    ctx.beginPath();
+    ctx.arc(0, 0, it.r * 0.55, 0, Math.PI * 2);
+    ctx.fillStyle = it.inner;
+    ctx.fill();
+
+    // 高光
+    ctx.beginPath();
+    ctx.arc(-it.r * 0.35, -it.r * 0.35, it.r * 0.3, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,.5)';
+    ctx.fill();
+
+    // 蒂
+    ctx.fillStyle = '#3a7a4a';
+    ctx.beginPath();
+    ctx.ellipse(0, -it.r - 2, 8, 4, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function drawBomb(it) {
+    ctx.beginPath();
+    ctx.arc(0, 0, it.r, 0, Math.PI * 2);
+    ctx.fillStyle = it.color;
+    ctx.fill();
+    ctx.strokeStyle = '#11141a';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(-it.r * 0.3, -it.r * 0.3, it.r * 0.3, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,.25)';
+    ctx.fill();
+
+    // 引线
+    ctx.strokeStyle = '#8a6b45';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(0, -it.r);
+    ctx.quadraticCurveTo(10, -it.r - 10, 6, -it.r - 18);
+    ctx.stroke();
+
+    // 火花
+    ctx.fillStyle = '#ffd966';
+    ctx.beginPath();
+    ctx.arc(6, -it.r - 18, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ff6f61';
+    ctx.beginPath();
+    ctx.arc(6, -it.r - 18, 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ---------- 输入 ----------
+  let touchUsed = false;
+  let lastX = 0, lastY = 0;
+
+  function getXY(e) {
+    const rect = canvas.getBoundingClientRect();
+    let clientX, clientY;
+    if (e.changedTouches && e.changedTouches.length) {
+      clientX = e.changedTouches[0].clientX;
+      clientY = e.changedTouches[0].clientY;
+    } else if (e.touches && e.touches.length) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+    return {
+      x: (clientX - rect.left) / rect.width * canvas.width,
+      y: (clientY - rect.top) / rect.height * canvas.height
+    };
+  }
+
+  function onDown(e) {
+    if (gameEnd || paused) return;
+    e.preventDefault();
+    touchUsed = true;
+    bladeActive = true;
+    const p = getXY(e);
+    lastX = p.x;
+    lastY = p.y;
+    blade = [{ x: p.x, y: p.y, time: performance.now() }];
+    // 点一下也能切
+    slice(p.x, p.y);
+  }
+
+  function onMove(e) {
+    if (!bladeActive || paused) return;
+    e.preventDefault();
+    const p = getXY(e);
+    const dx = p.x - lastX;
+    const dy = p.y - lastY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < 4) return;
+
+    const steps = Math.ceil(dist / 10);
+    for (let i = 1; i <= steps; i++) {
+      const x = lastX + dx * i / steps;
+      const y = lastY + dy * i / steps;
+      slice(x, y);
+    }
+
+    blade.push({ x: p.x, y: p.y, time: performance.now() });
+    if (blade.length > 18) blade.shift();
+    lastX = p.x;
+    lastY = p.y;
+  }
+
+  function onUp(e) {
+    if (!bladeActive) return;
+    e.preventDefault();
+    bladeActive = false;
+  }
+
+  canvas.addEventListener('touchstart', onDown, { passive: false });
+  canvas.addEventListener('touchmove', onMove, { passive: false });
+  canvas.addEventListener('touchend', onUp, { passive: false });
+  canvas.addEventListener('touchcancel', onUp, { passive: false });
+
+  canvas.addEventListener('mousedown', onDown);
+  canvas.addEventListener('mousemove', onMove);
+  canvas.addEventListener('mouseup', onUp);
+  canvas.addEventListener('mouseleave', onUp);
+
+  function togglePause() {
+    if (gameEnd) return;
+    paused = !paused;
+    pauseBtn.textContent = paused ? '继续' : '暂停';
+    pauseBtn.classList.toggle('active', paused);
+    if (!paused) {
+      lastTime = 0;   // 恢复时重置时间基准，避免跳帧
+    }
+  }
+
+  pauseBtn.addEventListener('click', togglePause);
+  pauseBtn.addEventListener('touchstart', (e) => { e.preventDefault(); togglePause(); }, { passive: false });
+
+  resetBtn.addEventListener('click', initGame);
+  resetBtn.addEventListener('touchstart', (e) => { e.preventDefault(); initGame(); }, { passive: false });
+
+  overRestart.addEventListener('click', initGame);
+  overRestart.addEventListener('touchstart', (e) => { e.preventDefault(); initGame(); }, { passive: false });
+
+  window.addEventListener('resize', () => { resizeCanvas(); draw(); });
+  window.addEventListener('orientationchange', () => { setTimeout(() => { resizeCanvas(); draw(); }, 200); });
+
+  initGame();
+})();
+</script>
+</body>
+</html>

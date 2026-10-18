@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>记忆翻牌</title>
+<style>
+  * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #15171c;
+    font-family: Arial, "Microsoft YaHei", sans-serif;
+    overflow: hidden;
+  }
+  body { display: flex; justify-content: center; align-items: center; padding: 6px; }
+
+  .game-container {
+    background: #1d2026;
+    border: 1px solid #333842;
+    padding: 8px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    width: 100%; height: 100%;
+    max-width: 460px;
+  }
+
+  .top-row { display: flex; gap: 6px; width: 100%; flex: 0 0 auto; }
+  .info-box {
+    flex: 1;
+    background: #14161a; border: 1px solid #333842;
+    padding: 4px 10px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .info-box .label { color: #6c7484; font-size: 12px; }
+  .info-box .value { color: #d8d8d8; font-size: 20px; font-weight: bold; }
+
+  .board-wrap {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+  }
+  canvas#board {
+    display: block;
+    background: #0d0f12;
+    border: 1px solid #333842;
+    touch-action: none;
+  }
+
+  .touch-controls { width: 100%; display: flex; flex-direction: column; gap: 5px; flex: 0 0 auto; }
+  .control-row { display: flex; gap: 5px; }
+  .touch-btn {
+    flex: 1;
+    background: #262a32; border: 1px solid #3a404b; color: #cfd4dc;
+    border-radius: 4px; font-size: 15px; font-family: inherit;
+    padding: 11px 0; cursor: pointer;
+  }
+  .touch-btn:active { background: #313742; }
+  .touch-btn.small { font-size: 13px; }
+  .touch-btn.active { background: #3a4f6b; border-color: #5a7aa0; color: #d8e6ff; }
+
+  .hint {
+    text-align: center;
+    color: #6c7484;
+    font-size: 11px;
+    letter-spacing: 1px;
+    margin-top: 2px;
+  }
+
+  .overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.7);
+    display: flex; justify-content: center; align-items: center;
+    z-index: 10;
+  }
+  .overlay.hidden { display: none; }
+  .panel {
+    background: #1d2026; border: 1px solid #3a404b; border-radius: 8px;
+    padding: 20px 24px; min-width: 250px; max-width: 90%;
+    color: #cfd4dc; font-size: 14px;
+  }
+  .panel h3 { margin: 0 0 16px; font-size: 16px; color: #e0e0e0; text-align: center; font-weight: normal; letter-spacing: 2px; }
+  .level-btn {
+    display: block; width: 100%; margin-bottom: 8px;
+    background: #262a32; border: 1px solid #3a404b; color: #cfd4dc;
+    border-radius: 4px; padding: 11px 0; font-family: inherit; font-size: 14px; cursor: pointer;
+  }
+  .level-btn.active { background: #3a4f6b; border-color: #5a7aa0; color: #d8e6ff; }
+  .level-btn:active { background: #313742; }
+  .panel .close { margin-top: 12px; }
+</style>
+</head>
+<body>
+<div class="game-container">
+  <div class="top-row">
+    <div class="info-box">
+      <span class="label">配对</span>
+      <span class="value" id="pairDisplay">0/6</span>
+    </div>
+    <div class="info-box">
+      <span class="label">步数</span>
+      <span class="value" id="moveDisplay">0</span>
+    </div>
+    <div class="info-box">
+      <span class="label">用时</span>
+      <span class="value" id="timeDisplay">0</span>
+    </div>
+  </div>
+
+  <div class="board-wrap">
+    <canvas id="board"></canvas>
+  </div>
+
+  <div class="touch-controls">
+    <div class="control-row">
+      <button class="touch-btn small" id="sizeBtn">选尺寸</button>
+      <button class="touch-btn small" id="resetBtn">重新开始</button>
+    </div>
+    <div class="hint">点击翻开两张，配对成功会留下</div>
+  </div>
+</div>
+
+<div class="overlay hidden" id="sizeOverlay">
+  <div class="panel">
+    <h3>选择尺寸</h3>
+    <button class="level-btn" data-cols="4" data-rows="3">4 × 3 · 6 对</button>
+    <button class="level-btn" data-cols="4" data-rows="4">4 × 4 · 8 对</button>
+    <button class="level-btn" data-cols="6" data-rows="4">6 × 4 · 12 对</button>
+    <button class="level-btn" data-cols="6" data-rows="6">6 × 6 · 18 对</button>
+    <button class="level-btn close" id="sizeClose">取消</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  const boardCanvas = document.getElementById('board');
+  const ctx = boardCanvas.getContext('2d');
+  const wrap = boardCanvas.parentElement;
+  const pairDisplay = document.getElementById('pairDisplay');
+  const moveDisplay = document.getElementById('moveDisplay');
+  const timeDisplay = document.getElementById('timeDisplay');
+  const sizeBtn = document.getElementById('sizeBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const sizeOverlay = document.getElementById('sizeOverlay');
+  const sizeClose = document.getElementById('sizeClose');
+
+  const SYMBOLS = ['●', '▲', '■', '★', '♦', '♣', '♥', '♠', '✦', '✿', '☀', '☂', '♪', '☯', '⚑', '✈', '☎', '✎'];
+  const COLORS = ['#5d9df9', '#5cdb95', '#ff6f61', '#b286fe', '#f9a26c', '#3ec1d3', '#f6d365', '#ff8fab',
+                  '#7ee0a0', '#a0c4ff', '#ffc09f', '#c7b9ff', '#ffadad', '#9bf6ff', '#fdffb6', '#bdb2ff'];
+
+  let cols = 4, rows = 3;
+  let cardW = 60, cardH = 80;
+  let deck = [];            // { symbol, color, matched, flipped }
+  let firstIdx = -1, secondIdx = -1;
+  let lock = false;         // 配对判定中，禁止点别的
+  let moves = 0, pairsMatched = 0, totalPairs = 0;
+  let seconds = 0, timer = null;
+  let won = false;
+
+  // ---------- 初始化 ----------
+  function initGame() {
+    if (timer) { clearInterval(timer); timer = null; }
+    totalPairs = (cols * rows) / 2;
+    pairsMatched = 0;
+    moves = 0;
+    seconds = 0;
+    won = false;
+    lock = false;
+    firstIdx = -1;
+    secondIdx = -1;
+    deck = buildDeck(totalPairs);
+    updateUI();
+    computeCardSize();
+    draw();
+    requestAnimationFrame(() => { computeCardSize(); draw(); });
+  }
+
+  function buildDeck(pairs) {
+    const arr = [];
+    for (let i = 0; i < pairs; i++) {
+      const symbol = SYMBOLS[i % SYMBOLS.length];
+      const color = COLORS[i % COLORS.length];
+      arr.push({ symbol, color, matched: false, flipped: false });
+      arr.push({ symbol, color, matched: false, flipped: false });
+    }
+    // 洗牌
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  function computeCardSize() {
+    const maxW = wrap.clientWidth;
+    const maxH = wrap.clientHeight;
+    const availW = maxW > 0 ? maxW : Math.min(window.innerWidth - 30, 440);
+    const availH = maxH > 0 ? maxH : Math.min(window.innerHeight - 220, 600);
+    cardW = Math.floor(availW / cols);
+    cardH = Math.floor(availH / rows);
+    // 保证卡片比例不太扁
+    cardH = Math.min(cardH, Math.floor(cardW * 1.4));
+    cardW = Math.min(cardW, Math.floor(cardH / 0.9));
+    cardW = Math.max(30, cardW);
+    cardH = Math.max(36, cardH);
+
+    const cw = cols * cardW, ch = rows * cardH;
+    if (boardCanvas.width !== cw || boardCanvas.height !== ch) {
+      boardCanvas.width = cw;
+      boardCanvas.height = ch;
+    }
+    boardCanvas.style.width = cw + 'px';
+    boardCanvas.style.height = ch + 'px';
+  }
+
+  // ---------- 绘制 ----------
+  function draw() {
+    const W = boardCanvas.width, H = boardCanvas.height;
+    if (W === 0 || H === 0) return;
+
+    ctx.fillStyle = '#0d0f12';
+    ctx.fillRect(0, 0, W, H);
+
+    for (let i = 0; i < deck.length; i++) {
+      const card = deck[i];
+      const r = Math.floor(i / cols), c = i % cols;
+      const px = c * cardW, py = r * cardH;
+      const pad = 3;
+      const w = cardW - pad * 2, h = cardH - pad * 2;
+
+      if (card.matched) {
+        // 已配对：淡淡地留一个底
+        ctx.fillStyle = '#1a1e26';
+        ctx.fillRect(px + pad, py + pad, w, h);
+        ctx.strokeStyle = '#2b4a38';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(px + pad, py + pad, w, h);
+        ctx.fillStyle = card.color;
+        ctx.globalAlpha = 0.35;
+        ctx.font = 'bold ' + Math.floor(Math.min(w, h) * 0.5) + 'px Arial, sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(card.symbol, px + cardW/2, py + cardH/2 + 1);
+        ctx.globalAlpha = 1;
+      } else if (card.flipped) {
+        // 翻开
+        ctx.fillStyle = '#2a2f3a';
+        ctx.fillRect(px + pad, py + pad, w, h);
+        ctx.strokeStyle = card.color;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(px + pad, py + pad, w, h);
+        ctx.fillStyle = card.color;
+        ctx.font = 'bold ' + Math.floor(Math.min(w, h) * 0.5) + 'px Arial, sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(card.symbol, px + cardW/2, py + cardH/2 + 1);
+      } else {
+        // 背面
+        ctx.fillStyle = '#262a32';
+        ctx.fillRect(px + pad, py + pad, w, h);
+        ctx.strokeStyle = '#3a404b';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(px + pad, py + pad, w, h);
+        // 中间小问号
+        ctx.fillStyle = '#4a5263';
+        ctx.font = 'bold ' + Math.floor(Math.min(w, h) * 0.4) + 'px Arial, sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('?', px + cardW/2, py + cardH/2 + 1);
+      }
+    }
+
+    if (won) {
+      ctx.fillStyle = 'rgba(0,0,0,.72)';
+      ctx.fillRect(0, 0, W, H);
+      ctx.font = 'bold ' + Math.floor(Math.min(W, H) * 0.1) + 'px Arial, sans-serif';
+      ctx.fillStyle = '#7ee0a0';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('全部配对！', W/2, H/2);
+    }
+  }
+
+  function updateUI() {
+    pairDisplay.textContent = pairsMatched + '/' + totalPairs;
+    moveDisplay.textContent = moves;
+    timeDisplay.textContent = seconds;
+  }
+
+  function startTimer() {
+    if (timer) clearInterval(timer);
+    timer = setInterval(() => {
+      if (!won) { seconds++; timeDisplay.textContent = seconds; }
+    }, 1000);
+  }
+
+  // ---------- 翻牌逻辑 ----------
+  function flipCard(idx) {
+    if (lock || won) return;
+    const card = deck[idx];
+    if (card.matched || card.flipped) return;
+
+    card.flipped = true;
+    draw();
+
+    if (firstIdx === -1) {
+      firstIdx = idx;
+      if (moves === 0 && seconds === 0) startTimer();
+      return;
+    }
+
+    // 第二张
+    secondIdx = idx;
+    moves++;
+    updateUI();
+    lock = true;
+
+    const a = deck[firstIdx], b = deck[secondIdx];
+    if (a.symbol === b.symbol) {
+      // 配对成功
+      setTimeout(() => {
+        a.matched = true;
+        b.matched = true;
+        pairsMatched++;
+        updateUI();
+        firstIdx = -1; secondIdx = -1;
+        lock = false;
+        draw();
+        checkWin();
+      }, 350);
+    } else {
+      // 不匹配，翻回去
+      setTimeout(() => {
+        a.flipped = false;
+        b.flipped = false;
+        firstIdx = -1; secondIdx = -1;
+        lock = false;
+        draw();
+      }, 750);
+    }
+  }
+
+  function checkWin() {
+    if (pairsMatched === totalPairs) {
+      won = true;
+      if (timer) { clearInterval(timer); timer = null; }
+      draw();
+    }
+  }
+
+  // ---------- 输入 ----------
+  let touchUsed = false;
+
+  function getIndexFromEvent(e) {
+    const rect = boardCanvas.getBoundingClientRect();
+    let clientX, clientY;
+    if (e.changedTouches && e.changedTouches.length) {
+      clientX = e.changedTouches[0].clientX;
+      clientY = e.changedTouches[0].clientY;
+    } else if (e.touches && e.touches.length) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+    const c = Math.floor((clientX - rect.left) / rect.width * cols);
+    const r = Math.floor((clientY - rect.top) / rect.height * rows);
+    if (c < 0 || c >= cols || r < 0 || r >= rows) return -1;
+    return r * cols + c;
+  }
+
+  function handleTap(e) {
+    const idx = getIndexFromEvent(e);
+    if (idx >= 0) flipCard(idx);
+  }
+
+  boardCanvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    touchUsed = true;
+    handleTap(e);
+  }, { passive: false });
+
+  boardCanvas.addEventListener('mousedown', (e) => {
+    if (touchUsed) return;
+    handleTap(e);
+  });
+  boardCanvas.addEventListener('mouseup', () => { touchUsed = false; });
+
+  // ---------- 按钮 ----------
+  resetBtn.addEventListener('click', initGame);
+  resetBtn.addEventListener('touchstart', (e) => { e.preventDefault(); initGame(); }, { passive: false });
+
+  function openSize() {
+    sizeOverlay.querySelectorAll('.level-btn[data-cols]').forEach(btn => {
+      const match = parseInt(btn.dataset.cols, 10) === cols && parseInt(btn.dataset.rows, 10) === rows;
+      btn.classList.toggle('active', match);
+    });
+    sizeOverlay.classList.remove('hidden');
+  }
+  sizeBtn.addEventListener('click', openSize);
+  sizeBtn.addEventListener('touchstart', (e) => { e.preventDefault(); openSize(); }, { passive: false });
+
+  sizeOverlay.querySelectorAll('.level-btn[data-cols]').forEach(btn => {
+    const handler = (e) => {
+      e.preventDefault();
+      cols = parseInt(btn.dataset.cols, 10);
+      rows = parseInt(btn.dataset.rows, 10);
+      sizeOverlay.classList.add('hidden');
+      initGame();
+    };
+    btn.addEventListener('click', handler);
+    btn.addEventListener('touchstart', handler, { passive: false });
+  });
+  sizeClose.addEventListener('click', () => sizeOverlay.classList.add('hidden'));
+  sizeClose.addEventListener('touchstart', (e) => { e.preventDefault(); sizeOverlay.classList.add('hidden'); }, { passive: false });
+
+  window.addEventListener('resize', () => { computeCardSize(); draw(); });
+  window.addEventListener('orientationchange', () => { setTimeout(() => { computeCardSize(); draw(); }, 200); });
+
+  initGame();
+})();
+</script>
+</body>
+</html>
