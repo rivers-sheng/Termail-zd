@@ -1,6 +1,6 @@
 # Termail-zd
 
-一款运行在 Android 上的**极致硬核终端模拟器**。
+一款运行在 Android 上的**终端模拟器**。
 
 底层基于 **C++** 与 **Qt6** 构建，将极客级的终端体验完美复刻到了移动端。它不仅仅是一个简单的命令执行器，更内置了网络服务、脚本引擎与海量游戏。
 
@@ -34,3 +34,4 @@
 
 ## 📄 开源协议
 本项目基于 GNU Affero General Public License v3.0 (AGPL-3.0) 协议开源。
+> 📄 **[点击此处查看第三方开源协议声明 (Third-Party Notices)](./THIRD_PARTY_NOTICES.md)**
