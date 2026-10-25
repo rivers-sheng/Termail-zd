@@ -4,6 +4,8 @@
 
 底层基于 **C++** 与 **Qt6** 构建，将极客级的终端体验完美复刻到了移动端。它不仅仅是一个简单的命令执行器，更内置了网络服务、脚本引擎与海量游戏。
 
+**[点击此处下载最新MAIN版](https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_final_patch2.apk)**
+**[点击此处下载最新GAME版](https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(GAME)/TermailGames_v1.4.apk)**
 ## ✨ 核心特性
 
 ### 🖥️ 沉浸式终端体验
