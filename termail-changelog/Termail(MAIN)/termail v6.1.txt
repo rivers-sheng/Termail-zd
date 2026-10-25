@@ -1,0 +1,124 @@
+Termail v6.0 → v6.1 更新说明
+版本号：6.0.0 → 6.1.0（versionCode 9 → 10，标签 Termail_v6 → Termail_v6.1）
+
+一、新增
+PRoot 环境（新模块 commands/proot_commands.cpp）
+
+proot-setup：从资源释放 proot 二进制到当前目录，释放 alpine.tar 并解压到 proot-env/rootfs，完成 Alpine rootfs 安装
+
+proot-shell [命令]：在 PRoot 容器内执行命令，带 /dev /proc /sys 绑定，PROOT_TMP_DIR 指定临时目录
+
+proot-mirror：写入 resolv.conf（8.8.8.8）并切换阿里云 Alpine 镜像源
+
+proot-install <包名>：通过 proot-shell /sbin/apk add --no-cache 安装软件
+
+proot-update：apk update 更新索引
+
+proot-status：显示 proot / rootfs 安装状态
+
+proot-remove：删除 proot-env 目录与 proot 二进制
+
+新命令（system）
+
+storage：切换 Android 存储目录（/sdcard、/storage/emulated/0 等），支持索引或路径
+
+root：通过 which su 检测 root 可用性
+
+lsroot：通过 su -c "ls /" 查看根目录
+
+stop：强制停止当前 currentProcess
+
+超时机制改为可选
+
+CommandHelper::runExternal/runShell 与 Utils::runExternal/runSystemCommand 的超时默认值从 30000 改为 0
+
+utils.cpp 中 if (timeout > 0) 才创建 QTimer，timeout == 0 表示永不超时
+
+proot-shell 等长命令走永不超时路径
+
+proot-shell、proot-mirror 传 timeout = 0，避免容器内命令被误杀
+
+资源
+
+CMake 资源列表新增 resources/proot/proot、resources/proot/alpine.tar
+
+二、修改
+commands.cpp / commands.h
+
+新增 registerProotCommands 声明与调用，注册链末尾追加
+
+CommandHelper 命名空间两个函数默认 timeout 改为 0
+
+utils.cpp / utils.h
+
+runSystemCommand / runExternal 默认 timeout 改为 0
+
+超时逻辑包在 if (timeout > 0) 内，0 时完全不创建定时器
+
+移除 process->start() 后的 state()/error() 立即检查（v5.4 有）
+
+system_commands.cpp
+
+help 的 helpMap 基本沿用 v6.0，新增 storage、root、lsroot、stop 未入表（helpMap 未列这些新命令）
+
+storage、root、lsroot、stop 四个新命令追加在 flag 之后
+
+network_commands.cpp
+
+ping 的 runExternal 超时参数从 30000 改为 0（永不超时）
+
+其余命令超时参数沿用默认值（现为 0）
+
+terminal.cpp
+
+欢迎信息新增 辅助制作:DeepSeek Chat 一行
+
+其余逻辑与 v6.0 一致
+
+config.h
+
+APP_NAME："Termail终端" → "Termail_v6.1"
+
+APP_VERSION："6.0.0" → "6.1.0"
+
+main.cpp
+
+setApplicationName("Termail_v6.1")，与 config.h 的 APP_NAME 一致（本次首次统一）
+
+CMakeLists.txt
+
+版本 6.1.0
+
+SOURCES 新增 commands/proot_commands.cpp
+
+资源新增 resources/proot/proot、resources/proot/alpine.tar
+
+QT_ANDROID_APP_NAME 从 "Termail终端" 改为 "Termail_v6.1"
+
+AndroidManifest.xml
+
+versionCode 9 → 10，versionName 6.0.0 → 6.1.0
+
+标签 Termail_v6 → Termail_v6.1
+
+新增权限：MANAGE_EXTERNAL_STORAGE、READ_MEDIA_IMAGES、READ_MEDIA_VIDEO、READ_MEDIA_AUDIO
+
+新增 android:requestLegacyExternalStorage="true"
+
+many1.cpp / many2.cpp / many3.cpp / file_commands.cpp / text_commands.cpp / fun_commands.cpp / cmenu.cpp / log_commands.cpp / minesweeper.cpp
+
+与 v6.0 内容一致，无改动
+
+三、其他
+proot-shell 通过 sh -c 拼接的完整命令含多层引号嵌套，proot-install 又调用 executeInternalCommand 转发，存在引号转义风险
+
+helpMap 未收录 proot-*、storage、root、lsroot、stop 等新命令
+
+CommandHelper 默认超时改为 0 后，network_commands.cpp 里未显式传超时的命令（curl/wget/netstat/route/arp 等）若系统命令挂起将永久阻塞
+
+ping 显式传 0，与之前 30000 行为不同
+
+utils.cpp 移除了 start() 后立即检查 state()/error() 的逻辑，启动失败改由 errorOccurred 信号覆盖
+
+proot_commands.cpp 中 proot-setup 的 tarProc.waitForFinished(60000) 仍为固定 60 秒，不受新超时机制影响
+

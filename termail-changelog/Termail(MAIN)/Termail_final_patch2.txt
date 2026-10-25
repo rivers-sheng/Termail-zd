@@ -1,0 +1,135 @@
+Termail v6.4.0 → v6.5.0 更新说明
+版本号：6.4.0 → 6.5.0（versionCode 13 → 14，标签 Termail 不变）
+
+一、新增
+network2_commands.cpp 重写为带用户系统的 Web 文件管理（本次最大改动）
+
+新增 HttpUser 结构（salt / hash / isRoot / r / w / x 权限位）
+
+新增全局 g_sessions（token → 用户名映射）
+
+新增用户存储 Utils::configDir() + "/http_users.json"，SHA-256(salt+password) 加盐哈希，16 字节随机 salt、24 字节随机 token
+
+首次启动自动初始化 root / 2510（root 权限全开）
+
+新增登录/登出流程：
+
+GET /login 登录页（居中卡片式）
+
+POST /login 校验密码后下发 Set-Cookie: sid=...; HttpOnly，302 跳 /
+
+/logout 清 session 并失效 cookie
+
+未登录一律 302 到 /login
+
+新增权限校验：isRoot || r 读、isRoot || w 写，无权限返回 403
+
+新增页面：
+
+主页：目录列表 + 搜索框（?q= 过滤）+ 批量删除 + 单个删除 + 上传 + 新建文件夹
+
+/view?path= 预览/在线编辑页（>1MB 拒绝预览，有写权限可保存）
+
+/save POST 保存编辑内容
+
+/batch-delete POST 批量删除（按 \n 分隔）
+
+/admin/users 用户管理页（仅 root）
+
+新增管理接口（均需二次输入 root 密码验证）：
+
+/admin/create 创建账户（可设 r/w/x）
+
+/admin/grant 改权限
+
+/admin/passwd 改密码
+
+/admin/promote 授予 ROOT
+
+/admin/revoke 撤销 ROOT
+
+/admin/delete 删除账户
+
+统一页面外壳 pageShell()：顶部栏显示当前用户、ROOT/USER 徽章、退出链接，root 额外显示「用户管理」
+
+htmlEscape() 统一转义、parseFormBody() 统一解析表单 body、extractSid() 从 Cookie 头提取 sid
+
+启动时终端输出「默认账户: root / 2510（请登录后立即修改）」
+
+utils.cpp 重写进程管理逻辑
+
+移除 v6.4 的 QElapsedTimer* 堆分配与 g_processCount 原子计数
+
+改为 QElapsedTimer elapsed 值语义 + lambda 拷贝捕获
+
+新增 std::shared_ptr<bool> cleaned 共享「已清理」标志
+
+新增统一收尾 lambda doCleanup()：finished 与 errorOccurred 共用，保证 currentProcess 置空、deleteLater 只执行一次
+
+超时定时器只负责 terminate/kill，清理统一交给 finished 回调
+
+超时定时器同时连 finished 和 errorOccurred 到 deleteLater
+
+main.cpp 版本号
+
+setApplicationVersion("6.4.0") → "6.5.0"（v6.4 遗留的硬编码，本次同步）
+
+AndroidManifest.xml
+
+versionCode 13 → 14，versionName 6.4.0 → 6.5.0
+
+CMakeLists.txt
+
+project(Termail VERSION 6.5.0)
+
+config.h
+
+APP_VERSION："6.4.0" → "6.5.0"
+
+二、修改
+network2_commands.cpp
+
+从 v6.4 的无认证 Web 文件管理器重写为带用户系统的版本
+
+serve 启动时先 loadUsers() 初始化 root
+
+请求聚合逻辑改为先解析 Content-Length 再聚合完整请求（v6.4 已有，本次沿用）
+
+移除 v6.4 的 generateIndexHtml 单参数版本，改为带 user/canR/canW/search 的多参数版本
+
+utils.cpp
+
+重写 runExternal 的清理逻辑（见新增）
+
+移除 #include <QAtomicInt>，新增 #include <memory>
+
+editor_commands.cpp / editor_dialog.cpp
+
+与 v6.4 一致，无改动
+
+lua_engine.cpp / lua_commands.cpp
+
+与 v6.4 一致，无改动
+
+commands.cpp / commands.h
+
+与 v6.4 一致，注册链不变（含 registerNotifyCommands，notify_commands.cpp 已在 CMake SOURCES 中）
+
+proot_commands.cpp
+
+与 v6.4 一致，无改动
+
+ssh_commands.cpp / session_commands.cpp / system_commands.cpp / file_commands.cpp / fun_commands.cpp / text_commands.cpp / cmenu.cpp / log_commands.cpp / about_commands.cpp / config_commands.cpp / enhanced_commands.cpp / many1/2/3/4.cpp / network_commands.cpp / notify_commands.cpp
+
+与 v6.4 内容一致，无改动
+
+三、说明
+main.cpp 的 setApplicationVersion("6.5.0") 与 config.h 的 APP_VERSION = "6.5.0" 本次首次对齐
+
+CMakeLists.txt 的 QT_ANDROID_APP_NAME "Termail" 与 config.h / main.cpp / Manifest 一致
+
+network2_commands.cpp 的 g_httpUi 全局指针在 v6.4 已声明，本次仍保留但未实际使用（serve 的 lambda 直接用捕获的 ui）
+
+network2_commands.cpp 的用户文件路径依赖 Utils::configDir()，与自定义命令、别名共用同一个 AppConfigLocation/termail 目录
+
+utils.cpp 的 doCleanup 用 shared_ptr<bool> 保证 finished 与 errorOccurred 只清理一次，解决了 v6.4 的双重释放问题

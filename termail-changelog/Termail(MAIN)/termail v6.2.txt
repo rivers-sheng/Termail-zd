@@ -1,0 +1,175 @@
+Termail v6.1 → v6.2 更新说明
+版本号：6.1.0 → 6.2.0（versionCode 10 → 11，标签 Termail_v6.1 → Termail_v6.2）
+
+一、新增
+多会话管理（commands/session_commands.cpp + terminal.cpp 会话结构）
+
+TerminalWidget 新增 Session 结构体（id / name / currentDir / history / outputBuffer / process / interactiveMode / interactiveProcess）
+
+成员 sessions（QMap<int, Session>）、currentSessionId、nextSessionId
+
+新增方法 createSession / switchSession / killSession / listSessions
+
+命令：
+
+session 子命令：new [名称] / list / switch <编号> / kill <编号>
+
+snew [名称]：新建会话
+
+slist：列出会话
+
+ssw <编号>：切换会话
+
+skill <编号>：删除会话
+
+提示符改为 [会话ID] 用户:路径$，切换会话时清屏并提示目录
+
+SSH 密钥管理（commands/ssh_commands.cpp）
+
+ssh-keygen [-t rsa|ed25519|ecdsa] [-C 注释] [-f 文件名]：调用系统 ssh-keygen 生成密钥到 .ssh/，失败时提示用 PRoot 安装 openssh
+
+ssh-pub [密钥名]：显示公钥，支持自动回退常见文件名
+
+ssh-list：列出 .ssh 目录所有文件
+
+ssh-copy <用户@主机>：通过 cat pubkey | ssh ... >> authorized_keys 推送公钥
+
+ssh-rm <密钥名>：删除私钥与 .pub
+
+局域网/HTTP 服务器（commands/network2_commands.cpp）
+
+serve [端口]：启动 HTTP 文件服务器（默认 8080），支持目录列表、文件下载，启动时列出本机非回环 IPv4 访问地址
+
+stop-serve：关闭服务器
+
+netscan [网段] [起始] [结束]：逐个 ping -c 1 -W 1 扫描局域网（最多 254 个地址），显示在线设备
+
+mget <URL>：异步下载（QNetworkAccessManager + 信号槽，不阻塞）
+
+游戏（games/tetris.*、games/snake.*、games/game2048.*、commands/game_commands.cpp）
+
+tetris：俄罗斯方块（QDialog + paintEvent 自绘 + 底部方向按钮）
+
+snake：贪吃蛇（2 秒倒计时开始，每 100 分加速）
+
+g2048：2048（键盘/方向按钮/鼠标滑动三种操作）
+
+games：游戏菜单
+
+终端状态栏
+
+setupUI 新增底部 statusLabel（22px 高），显示当前目录、磁盘可用/总量、当前会话 ID
+
+statusTimer 每 2 秒刷新 updateStatusBar()
+
+别名持久化
+
+loadAliases() / saveAliases()：aliases.json 存于 AppConfigLocation/termail/
+
+构造函数启动加载，析构保存
+
+file_commands.cpp 的 ls 上色
+
+目录 ACCENT_COLOR、可执行文件 PROMPT_COLOR、符号链接 #00ffff、隐藏文件 INFO_COLOR
+
+-l 格式第一列区分 d / l / -
+
+日志窗口上色（log_commands.cpp）
+
+系统日志：按 Android logcat 级别 E/W/D/V/I 与 FATAL 上色（红/橙/灰/深灰/白/亮红）
+
+logcat 参数改为 -d -v brief，journalctl 行数 200，输出上限 100000
+
+Termail 日志：支持 类型|内容 格式写入，类型 错误/警告/调试/提示 分别对应 ERROR/WARN/DEBUG/TIP，写入时同步上色
+
+二、修改
+commands.cpp / commands.h
+
+注册链新增 registerSessionCommands、registerNetwork2Commands、registerSshCommands、registerGameCommands
+
+terminal.h / terminal.cpp
+
+新增 statusLabel、statusTimer、sessions、currentSessionId、nextSessionId、createSession/switchSession/killSession/listSessions、loadAliases/saveAliases、updateStatusBar
+
+构造函数初始化会话 1（名 main），析构保存别名
+
+updatePrompt() 加会话 ID 前缀
+
+executePipeline / executeRedirect 的 waitForFinished(10000) 改为 -1（永不超时）
+
+handleEasterEgg 改为恒返回 false（扫雷彩蛋失效）
+
+欢迎信息新增 输入 'session new' 创建新会话
+
+输出区上方的 promptLabel / inputField 布局未变，但在其上方插入了 statusLabel
+
+cmenu.cpp
+
+与 v6.1 一致（仍为简化版，无 SHA256 校验）
+
+fun_commands.cpp / text_commands.cpp / many1/2/3.cpp / network_commands.cpp / proot_commands.cpp / file_commands.cpp
+
+与 v6.1 内容基本一致；file_commands.cpp 的 ls 有上色改动（见新增）
+
+system_commands.cpp
+
+helpMap 与 v6.1 一致，未新增 session / ssh / game / serve / netscan / mget 条目
+
+mine / flag 命令已移除（扫雷引擎未在 CMake SOURCES 中）
+
+config.h
+
+APP_NAME："Termail_v6.1" → "Termail_v6.2"
+
+APP_VERSION："6.1.0" → "6.2.0"
+
+main.cpp
+
+setApplicationName("Termail_v6.2")，setApplicationVersion("6.2.0")
+
+CMakeLists.txt
+
+版本 6.2.0
+
+SOURCES 新增：commands/session_commands.cpp、commands/network2_commands.cpp、commands/ssh_commands.cpp、games/tetris.cpp、games/snake.cpp、games/game2048.cpp、commands/game_commands.cpp
+
+移除 games/minesweeper.cpp
+
+HEADERS 新增 games/tetris.h、games/snake.h、games/game2048.h，移除 games/minesweeper.h
+
+资源不变
+
+QT_ANDROID_APP_NAME 仍为 "Termail_v6.1"（未同步到 6.2）
+
+AndroidManifest.xml
+
+versionCode 10 → 11，versionName 6.1.0 → 6.2.0
+
+标签 Termail_v6.1 → Termail_v6.2
+
+权限与 requestLegacyExternalStorage 与 v6.1 一致
+
+三、其他
+扫雷整体下线：minesweeper.cpp/.h 从 CMake 移除，system_commands.cpp 中 mine / flag 命令删除，handleEasterEgg 恒返回 false
+
+CMakeLists.txt 的 QT_ANDROID_APP_NAME 与 config.h / main.cpp 的版本号不一致（6.1 vs 6.2）
+
+Session 结构体的 process / interactiveProcess / outputBuffer 字段声明但未实际使用，会话切换只保存 currentDir 与 history
+
+switchSession 不清空/恢复 interactiveMode，若在交互模式中切换会话，interactiveProcess 仍指向旧会话进程
+
+killSession 不终止被删会话可能残留的 process / interactiveProcess
+
+serve 的 g_httpServer 为全局 static，stop-serve 后 delete，但 newConnection lambda 捕获 ui，若 ui 已销毁后再有连接会悬空
+
+netscan 在主线程逐个 ping 等待（每个最多 1.5 秒），扫描 254 个地址会阻塞 UI 数分钟
+
+mget 里创建了 QEventLoop loop 与 QTimer::singleShot(0, ...) 但未使用，属于残留代码
+
+ssh-keygen 调用外部 ssh-keygen，Android 无此命令时会提示用 PRoot 安装
+
+help 的 helpMap 未收录本轮新增的 session / ssh / serve / netscan / mget / tetris / snake / g2048 / games 等命令
+
+cmenu.cpp 顶部 QCryptographicHash include 未使用
+
+game2048.cpp 的 SIZE/CELL/GAP 是 static const int 类内定义，未在类外定义（C++17 下 inline 语义可编译，但若被 ODR-use 需注意）

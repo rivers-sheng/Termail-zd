@@ -1,0 +1,60 @@
+Termail Games v1.1.0 → v1.2.0 更新说明
+版本号：1.1.0 → 1.2.0（versionCode 2 → 3，包名 com.termail.spical 不变）
+
+一、新增
+游戏列表扩容 28 → 30
+
+htmlgames.cpp 与 help_commands.cpp 各新增 2 个游戏：
+
+[29] dou-di-zhu（斗地主）
+
+[30] guard-the-blue（守护蔚蓝）—— 作者参加厦门市集美区「守护蔚蓝」主题创作的作品
+
+help_commands.cpp 游戏表定义去重
+
+v1.1.0：局部结构体 struct HtmlGame + 静态表 htmlGames
+
+v1.2.0：删除局部结构体与 htmlGames，改为直接复用 htmlgames.h 的 HtmlGame 与 g_games，help / games / 批量注册三处循环统一引用 g_games，消除了 v1.1.0 里两份重复游戏表需同步维护的问题
+
+二、修改
+config.h
+
+v1.1.0：APP_VERSION = "1.1.0"（v1.1.0 的 config.h 实际未随 main.cpp 一起升到 1.1.0 以外的改动，本次仍是 1.1.0）
+
+v1.2.0：APP_VERSION 仍为 "1.1.0"（未同步到 1.2.0）
+
+main.cpp
+
+v1.1.0：setApplicationVersion("1.1.0")
+
+v1.2.0：setApplicationVersion("1.2.0")
+
+CMakeLists.txt
+
+project(TermailGames VERSION 1.1.0) → 1.2.0
+
+AndroidManifest.xml
+
+versionCode 2 → 3，versionName 1.1.0 → 1.2.0
+
+help_commands.cpp
+
+游戏表从本地 htmlGames 改为引用 htmlgames.h 的 g_games（见新增）
+
+launchHtmlGame / readGameInfo 实现与 v1.1.0 一致，仍走 ComponentName 显式启动
+
+findGame 的编号判断 if (isNum && num >= 1) 与 v1.1.0 一致
+
+htmlgames.cpp / htmlgames.h
+
+g_games 从 28 条扩到 30 条，其余方法（allGames / findGame / isGame / launch / readGameInfo）与 v1.1.0 一致
+
+terminal.cpp / terminal.h / commands.cpp / commands.h / fun_commands.cpp / utils.cpp / utils.h
+
+与 v1.1.0 内容一致，无改动
+
+三、其他
+
+terminal.cpp 的 displayWelcome 里 QString(...).arg(APP_VERSION) 占位符 %1 在字符串中不存在，arg 调用无效，欢迎信息实际不显示版本号（v1.1.0 已如此，本次未改）
+
+help_commands.cpp 去重后游戏表只维护 htmlgames.cpp 一份，是本次实际的结构性改进

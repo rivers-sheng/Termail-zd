@@ -1,0 +1,128 @@
+Termail v5.1 → v5.2 更新说明
+版本号：5.1.0 → 5.2.0（CMake / config.h / main.cpp / AndroidManifest 同步升级，versionCode 6 → 7）
+
+一、新增
+三个新命令源文件（批量命令注册）
+
+commands/many1.cpp → registerMany1Commands：约 60 个外部命令转发
+
+开发工具：gdb、gprof、strace、ltrace、valgrind、cmake、automake、autoconf、pkg-config、ldd、nm、objdump、readelf、strings、strip、ar、ranlib、as、ld、flex
+
+安全：openssl、gpg、md5sum、sha1sum、sha256sum、sha512sum、chroot、sudo、su、passwd
+
+压缩：gzip、gunzip、bzip2、bunzip2、xz、unxz、7z、rar、unrar、zcat、bzcat、xzcat、zless、zmore、zipinfo、unzipsfx
+
+网络：ssh、scp、rsync、ftp、tftp、sftp、telnet、nc、socat、nmap、tcpdump、dig、host
+
+commands/many2.cpp → registerMany2Commands：约 60 个外部命令转发
+
+磁盘/文件系统：mount、umount、fdisk、mkfs、mkfs.ext4/3、mkfs.vfat、fsck、dd、sync、swapon、swapoff、losetup、blkid、lsblk、parted、iostat、vmstat、sar、mpstat
+
+硬件：lspci、lsusb、lshw、dmidecode、hdparm、sdparm、sensors、hwinfo
+
+进程：htop、killall、pkill、pgrep、nice、renice、nohup、bg、fg、pidof
+
+用户：useradd、userdel、usermod、groupadd、groupdel、groupmod、chown、chgrp、chage、lastlog
+
+系统服务：systemctl、service、shutdown、reboot、poweroff、halt、init、runlevel、dmesg、journalctl
+
+commands/many3.cpp → registerMany3Commands：约 90 个外部命令转发
+
+查找/文档：whereis、locate、updatedb、man、info、whatis、apropos
+
+文本：awk、perl、egrep、fgrep、printf、column、expand、unexpand、od、hexdump、xxd、patch、comm、cmp、fold
+
+日期：cal、ncal、hwclock、timedatectl
+
+网络：ip、ss、iptables、nft、ethtool、iwconfig、iwlist、resolvectl
+
+其他：dc、numfmt、shred、truncate、mktemp、realpath、readlink、basename、dirname、hostid、nproc、getconf、ulimit、xargs、printenv、unset、logout 等
+
+日志系统（commands/log_commands.cpp）
+
+log：系统日志窗口（无边框覆盖式 QDialog）
+
+平台分支：Android 走 logcat -d，其他走 journalctl --no-pager -n 100
+
+输入框支持：直接输入过滤词 → 刷新过滤；/命令 → 在窗口内执行 shell 并回显；/exit-log 关闭；/log-termail 切换
+
+输出上限 50000 字符，超出截取尾部
+
+log-termail：Termail 程序日志窗口
+
+读取当前目录 termail.log 显示
+
+输入普通文本 → 追加写入日志文件（带 [yyyy-MM-dd hh:mm:ss] 时间戳）
+
+/命令 执行 shell、/exit-log 关闭、/log 切换回系统日志
+
+exit-log：主终端命令，统一关闭两个日志窗口
+
+help 命令大幅扩充
+
+helpMap 覆盖范围扩大到新加的 many1/2/3 命令（ssh、scp、gdb、cmake、systemctl、htop、awk、ip、ss 等）
+
+新增日志三命令条目：log、log-termail、exit-log
+
+新增 logout、printenv、chown、chgrp、whereis 等条目
+
+部分条目说明被精简（如 ls 的 -a/-l 详细说明在新版中删掉，只保留单行）
+
+二、修改
+commands.h / commands.cpp
+
+新增 4 个私有注册函数声明：registerMany1Commands、registerMany2Commands、registerMany3Commands、registerLogCommands
+
+registerAllBuiltins() 调用链扩展为 10 个注册函数：
+
+text
+registerFileCommands
+registerNetworkCommands
+registerSystemCommands
+registerTextCommands
+registerFunCommands
+registerCmenuCommands
+registerMany1Commands
+registerMany2Commands
+registerMany3Commands
+registerLogCommands
+CMakeLists.txt
+
+project(... VERSION 5.1.0) → 5.2.0
+
+SOURCES 新增 4 项：commands/many1.cpp、commands/many2.cpp、commands/many3.cpp、commands/log_commands.cpp
+
+config.h
+
+APP_NAME："Termail_v5.1" → "Termail_v5.2"
+
+APP_VERSION："5.1.0" → "5.2.0"
+
+main.cpp
+
+app.setApplicationVersion："5.1.0" → "5.2.0"
+
+AndroidManifest.xml
+
+versionCode 6 → 7，versionName 5.1.0 → 5.2.0
+
+应用标签 Termail_v5.1 → Termail_v5.2（application + activity 两处）
+
+many3.cpp 的命令遮蔽关系（值得注意）
+
+many3 里重新注册了 stat、file、du、df、free、uname、uptime、hostname、clear、exit、watch、tee、yes、seq、shuf、timeout、env、export、source、alias、unalias、history
+
+由于 registerMany3Commands 在 registerFileCommands/registerSystemCommands/registerTextCommands 之后执行，这些同名命令会覆盖前面内置实现，改为直接转发系统程序
+
+影响：stat/du/df/free/uname/uptime 等原本纯 Qt 实现，现在依赖系统命令存在；history 从终端历史列表变成系统 history；exit/clear 仍保留 Qt 实现（many3 里确实重新给了 Qt 实现，行为不变）
+
+三、其他
+cmenu.cpp、file_commands.cpp、fun_commands.cpp、network_commands.cpp、system_commands.cpp、text_commands.cpp、minesweeper.cpp/.h、terminal.cpp/.h、utils.cpp/.h、GPL.txt 与 v5.1 内容一致，无改动
+
+file_commands.cpp 顶部重复 #include <QStorageInfo> 的冗余保留
+
+which 的 if (true) 死代码保留
+
+log_commands.cpp 使用文件级 static 全局指针（g_logDialog / g_termailLogDialog）管理窗口生命周期，注意关闭后置空逻辑只在部分路径（/exit-log、切换）中执行，WA_DeleteOnClose 触发时指针可能悬空
+
+many1/2/3 全部采用单行 lambda 风格，ui/a 简写，风格与其他文件不统一

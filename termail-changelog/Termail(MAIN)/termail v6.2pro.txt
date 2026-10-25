@@ -1,0 +1,93 @@
+Termail v6.2 → v6.2 Pro 更新说明
+版本号：6.2.0 → 6.2.0_Pro（versionCode 11 → 12，标签 Termail_v6.2 → Termail_v6.2_Pro）
+
+一、新增
+PRoot 多发行版支持（commands/proot_commands.cpp）
+
+新增 getDistro / setDistro / getRootfs 三个 lambda 辅助函数，发行版标记存于 proot-env/distro
+
+distro [list|alpine|ubuntu]：发行版切换命令
+
+list：列出 alpine / ubuntu 安装状态与当前发行版
+
+distro ubuntu：未安装时自动从 :/resources/proot/ubuntu.tar 解压（分块读写，120 秒超时），完成后切换
+
+distro alpine：切换回 Alpine
+
+proot-shell：按当前发行版选择 rootfs 路径与 shell（Ubuntu 用 /bin/bash，Alpine 用 /bin/sh），工作目录 -w /root
+
+proot-mirror：按发行版写不同镜像源（Ubuntu 用 ubuntu-ports jammy，Alpine 用 v3.19）
+
+proot-install：Ubuntu 走 apt update && apt install -y，Alpine 走 apk add --no-cache
+
+proot-status：显示 proot、当前发行版、Alpine、Ubuntu 四项状态
+
+proot-setup：Alpine 安装完成后写入 distro 标记为 alpine
+
+pre-position 命令
+
+输出一份完整的前置命令清单（PRoot 环境、软件安装、多会话、网络工具、SSH、日志、设置），并给出完整安装顺序建议（get-busybox → proot-setup → proot-mirror → proot-update → distro ubuntu → proot-install coreutils）
+
+资源
+
+CMake 资源列表新增 resources/proot/ubuntu.tar
+
+二、修改
+commands.h / commands.cpp
+
+与 v6.2 一致，注册链不变（registerProotCommands 已含在 registerAllBuiltins）
+
+proot_commands.cpp 整体改写
+
+v6.2 的 proot-shell / proot-mirror / proot-install / proot-status 全部改为按发行版分支
+
+proot-shell 的 -w 从 / 改为 /root
+
+proot-setup 只装 Alpine，Ubuntu 由 distro ubuntu 触发
+
+proot-remove 不变
+
+config.h
+
+APP_NAME："Termail_v6.2" → "Termail_v6.2_Pro"
+
+APP_VERSION：保持 "6.2.0"
+
+main.cpp
+
+setApplicationName("Termail_v6.2_Pro")，setApplicationVersion("6.2.0")
+
+CMakeLists.txt
+
+project(... VERSION 6.2.0) 未变（与 config.h 的 6.2.0_Pro 不一致）
+
+资源新增 resources/proot/ubuntu.tar
+
+QT_ANDROID_APP_NAME 仍为 "Termail_v6.1"（未同步）
+
+AndroidManifest.xml
+
+versionCode 11 → 12，versionName 6.2.0 → 6.2.0_Pro
+
+标签 Termail_v6.2 → Termail_v6.2_Pro（application + activity 两处）
+
+权限与 requestLegacyExternalStorage 与 v6.2 一致
+
+file_commands.cpp / fun_commands.cpp / game_commands.cpp / log_commands.cpp / many1/2/3.cpp / network_commands.cpp / network2_commands.cpp / session_commands.cpp / ssh_commands.cpp / system_commands.cpp / text_commands.cpp / game2048.* / snake.* / tetris.* / terminal.cpp/.h / utils.cpp/.h / cmenu.cpp / GPL.txt
+
+与 v6.2 内容一致，无改动
+
+三、其他
+CMakeLists.txt 的 QT_ANDROID_APP_NAME（6.1）与 config.h / main.cpp / Manifest（6.2_Pro）三处版本号仍不统一
+
+CMakeLists.txt 的 project(VERSION 6.2.0) 与 APP_NAME 的 6.2.0_Pro 后缀不一致
+
+distro ubuntu 的 tar 解压用 120 秒固定超时，Ubuntu rootfs 较大时可能不够
+
+proot-install 在 Ubuntu 下通过 executeInternalCommand("proot-shell apt update && apt install -y ...") 转发，依赖 executeInternalCommand 对 && 的拆分，实际执行时 proot-shell 会先跑 apt update，再跑 apt install，两次进入 PRoot 环境
+
+pre-position 未列入 helpMap
+
+proot-setup 不再处理 ubuntu.tar，Ubuntu 只能通过 distro ubuntu 安装
+
+proot-env/distro 标记文件在 proot-remove 时随 proot-env 目录一起删除

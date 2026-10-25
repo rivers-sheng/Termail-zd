@@ -1,0 +1,82 @@
+Termail v5 → v5.1 更新说明
+版本号：5.0.0 → 5.1.0（CMake / AndroidManifest / main.cpp / config.h 同步升级，AndroidManifest versionCode 5 → 6）
+
+一、新增
+busybox 集成（本次最大改动）
+
+get-busybox：从资源 :/resources/busybox/busybox 释放 busybox 二进制到当前目录，并设置可执行权限（owner/group/other 的 rwx），成功时提示路径和大小
+
+bb <命令> [参数]：调用当前目录下的 busybox 执行任意 busybox 命令；未安装时提示先运行 get-busybox
+
+CMake 资源列表新增 resources/busybox/busybox
+
+help 命令升级
+
+支持 help <命令名>：从内置的大 helpMap 中查具体用法，找不到时提示"未找到命令"并引导回 help 列表
+
+无参数时保留原命令列表输出，末尾新增提示"输入 help <命令名> 查看具体用法"
+
+helpMap 覆盖全部内置命令（基础/文件/网络/系统/文本/趣味/扫雷/自定义/busybox），部分命令带多行说明（如 ls、cd、calc、mine、addcmd、get-busybox、bb）
+
+cmenu 重写
+
+v5 的 cmenu 是一份手写的完整命令清单
+
+v5.1 的 cmenu 改为 busybox 扩展命令菜单：说明未安装时先 get-busybox、bb 调用方式、常见示例（bb ls -la、bb wget ...、bb nc -l -p 8080 等）、常用 busybox 命令分类列表
+
+二、修改
+cmenu.cpp
+
+文件职责整体改变：从"命令清单输出"变为"busybox 菜单 + 安装 + 调用"三件套
+
+新增 include：utils/utils.h、QNetworkAccessManager、QStandardPaths、QNetworkReply、QNetworkRequest、QUrl、QEventLoop、QTimer、QFile、QDir（为 bb/get-busybox 服务）
+
+system_commands.cpp
+
+help lambda 捕获参数由 (const QStringList&) 改为 (const QStringList& args)，内部按有无参数分支
+
+helpMap 是本次主要新增内容（见上）
+
+terminal.cpp
+
+欢迎信息文案更新：
+
+v5：输入 'help' 查看所有命令 输入 'cmenu' 查看详细指令
+
+v5.1：输入 'help' 查看所有命令 输入 'get-busybox' 获得更多linux指令
+
+config.h
+
+APP_NAME："Termail终端" → "Termail_v5.1"
+
+APP_VERSION："5.0.0" → "5.1.0"
+
+其余颜色/字体/扫雷常量不变
+
+main.cpp
+
+app.setApplicationVersion："5.0.0" → "5.1.0"
+
+app.setApplicationName 仍为 "Termail终端"（与 config.h 的 APP_NAME 未同步，属不一致点）
+
+CMakeLists.txt
+
+project(... VERSION 5.0.0) → 5.1.0
+
+资源列表新增 resources/busybox/busybox
+
+AndroidManifest.xml
+
+versionCode 5 → 6，versionName 5.0.0 → 5.1.0
+
+应用标签 Termail_v5 → Termail_v5.1（application 和 activity 两处）
+
+三、其他
+file_commands.cpp、fun_commands.cpp、network_commands.cpp、text_commands.cpp、commands.cpp/.h、minesweeper.cpp/.h、terminal.h、utils.cpp/.h、GPL.txt 本次与 v5 内容一致，无改动
+
+file_commands.cpp 顶部 #include <QStorageInfo> 重复两行的冗余仍保留
+
+which 命令的 if (true) 死代码分支仍保留
+
+GPL.txt 末尾的示例应用名已从 <program> 改为 termail Copyright (C) 2026 rivers晟（v5 阶段已改，非本次改动）
+

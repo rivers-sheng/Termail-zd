@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>贪吃蛇</title>
+<style>
+  * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #15171c;
+    font-family: Arial, "Microsoft YaHei", sans-serif;
+    overflow: hidden;
+  }
+  body { display: flex; justify-content: center; align-items: center; padding: 6px; }
+
+  .game-container {
+    background: #1d2026;
+    border: 1px solid #333842;
+    padding: 8px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    width: 100%; height: 100%;
+    max-width: 460px;
+  }
+
+  .top-row { display: flex; gap: 6px; width: 100%; flex: 0 0 auto; }
+  .info-box {
+    flex: 1;
+    background: #14161a; border: 1px solid #333842;
+    padding: 4px 10px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .info-box .label { color: #6c7484; font-size: 12px; }
+  .info-box .value { color: #d8d8d8; font-size: 20px; font-weight: bold; }
+  .info-box .value.speed { color: #ffd966; }
+
+  .board-wrap {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+  }
+  #board {
+    display: block;
+    aspect-ratio: 1 / 1;
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: 100%;
+    background: #0d0f12;
+    border: 1px solid #333842;
+  }
+  .start-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: rgba(0,0,0,.55);
+    cursor: pointer;
+    color: #e0e0e0;
+    font-size: 22px;
+    font-weight: bold;
+    letter-spacing: 2px;
+  }
+  .start-overlay.hidden { display: none; }
+
+  .touch-controls { width: 100%; display: flex; flex-direction: column; gap: 5px; flex: 0 0 auto; }
+  .control-row { display: flex; gap: 5px; }
+  .touch-btn {
+    flex: 1;
+    background: #262a32; border: 1px solid #3a404b; color: #cfd4dc;
+    border-radius: 4px; font-size: 17px; font-family: inherit;
+    padding: 10px 0; cursor: pointer;
+  }
+  .touch-btn:active { background: #313742; }
+  .touch-btn.reset { font-size: 14px; }
+
+  .dpad { display: flex; flex-direction: column; gap: 5px; align-items: center; }
+  .dpad .control-row { width: 100%; justify-content: center; gap: 5px; }
+  .dpad .touch-btn {
+    flex: 0 0 30%;
+    max-width: 110px;
+    padding: 14px 0;
+    font-size: 20px;
+  }
+
+  /* 设置面板 */
+  .settings-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10;
+  }
+  .settings-overlay.hidden { display: none; }
+  .settings-panel {
+    background: #1d2026;
+    border: 1px solid #3a404b;
+    border-radius: 8px;
+    padding: 20px 24px;
+    min-width: 260px;
+    max-width: 90%;
+    color: #cfd4dc;
+    font-size: 14px;
+  }
+  .settings-panel h3 {
+    margin: 0 0 16px;
+    font-size: 16px;
+    color: #e0e0e0;
+    text-align: center;
+    font-weight: normal;
+    letter-spacing: 2px;
+  }
+  .setting-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+  .setting-item label { color: #9aa2b1; }
+  .setting-item input[type="number"] {
+    width: 70px;
+    background: #14161a;
+    border: 1px solid #3a404b;
+    color: #d8d8d8;
+    padding: 5px 8px;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 14px;
+    text-align: center;
+  }
+  .setting-item input[type="checkbox"] {
+    width: 18px; height: 18px;
+    accent-color: #5cdb95;
+  }
+  .settings-btns { display: flex; gap: 8px; margin-top: 20px; }
+  .settings-btns button {
+    flex: 1;
+    padding: 9px 0;
+    background: #262a32;
+    border: 1px solid #3a404b;
+    color: #cfd4dc;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .settings-btns button.primary { background: #2b3a4a; border-color: #3a4f6b; color: #b8cbe8; }
+  .settings-btns button:active { background: #313742; }
+</style>
+</head>
+<body>
+<div class="game-container">
+  <div class="top-row">
+    <div class="info-box">
+      <span class="label">分数</span>
+      <span class="value" id="scoreDisplay">0</span>
+    </div>
+    <div class="info-box">
+      <span class="label">最高</span>
+      <span class="value" id="bestDisplay">0</span>
+    </div>
+    <div class="info-box">
+      <span class="label">速度</span>
+      <span class="value speed" id="speedDisplay">1</span>
+    </div>
+  </div>
+
+  <div class="board-wrap">
+    <canvas id="board" width="400" height="400"></canvas>
+    <div class="start-overlay" id="startOverlay">点击开始</div>
+  </div>
+
+  <div class="touch-controls">
+    <div class="dpad">
+      <div class="control-row">
+        <button class="touch-btn" id="upBtn">↑</button>
+      </div>
+      <div class="control-row">
+        <button class="touch-btn" id="leftBtn">←</button>
+        <button class="touch-btn" id="downBtn">↓</button>
+        <button class="touch-btn" id="rightBtn">→</button>
+      </div>
+    </div>
+    <div class="control-row">
+      <button class="touch-btn" id="settingsBtn">设置</button>
+      <button class="touch-btn" id="pauseBtn">暂停</button>
+      <button class="touch-btn reset" id="resetBtn">重新开始</button>
+    </div>
+  </div>
+</div>
+
+<!-- 设置面板 -->
+<div class="settings-overlay hidden" id="settingsOverlay">
+  <div class="settings-panel">
+    <h3>设 置</h3>
+    <div class="setting-item">
+      <label>初始速度（ms/格）</label>
+      <input type="number" id="baseSpeedInput" min="80" max="500" step="10" value="250">
+    </div>
+    <div class="setting-item">
+      <label>每得 100 分加速</label>
+      <input type="checkbox" id="speedUpCheck" checked>
+    </div>
+    <div class="setting-item">
+      <label>每次加速（ms）</label>
+      <input type="number" id="speedUpStepInput" min="5" max="80" step="5" value="25">
+    </div>
+    <div class="setting-item">
+      <label>最低速度（ms/格）</label>
+      <input type="number" id="minSpeedInput" min="60" max="300" step="10" value="100">
+    </div>
+    <div class="settings-btns">
+      <button id="settingsCancel">取消</button>
+      <button class="primary" id="settingsConfirm">确定</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const COLS = 20, ROWS = 20;
+  const CELL = 20;
+
+  const boardCanvas = document.getElementById('board');
+  const ctx = boardCanvas.getContext('2d');
+  const scoreDisplay = document.getElementById('scoreDisplay');
+  const bestDisplay = document.getElementById('bestDisplay');
+  const speedDisplay = document.getElementById('speedDisplay');
+  const pauseBtn = document.getElementById('pauseBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const settingsBtn = document.getElementById('settingsBtn');
+  const upBtn = document.getElementById('upBtn');
+  const downBtn = document.getElementById('downBtn');
+  const leftBtn = document.getElementById('leftBtn');
+  const rightBtn = document.getElementById('rightBtn');
+  const startOverlay = document.getElementById('startOverlay');
+
+  // 设置面板元素
+  const settingsOverlay = document.getElementById('settingsOverlay');
+  const baseSpeedInput = document.getElementById('baseSpeedInput');
+  const speedUpCheck = document.getElementById('speedUpCheck');
+  const speedUpStepInput = document.getElementById('speedUpStepInput');
+  const minSpeedInput = document.getElementById('minSpeedInput');
+  const settingsCancel = document.getElementById('settingsCancel');
+  const settingsConfirm = document.getElementById('settingsConfirm');
+
+  // 可配置项（默认值）
+  let baseSpeed = 250;         // 初始速度 ms/格
+  let speedUpEnabled = true;   // 是否每100分加速
+  let speedUpStep = 25;        // 每次加速减少的 ms
+  let minSpeed = 100;          // 最低 ms/格（速度上限）
+
+  let snake, dir, nextDir, food, score, best;
+  let gameOver, paused, won;
+  let phase = 'idle';
+  let countdown = 0;
+  let timer = null;
+  let currentInterval = baseSpeed;   // 当前实际间隔
+
+  // 从本地读取设置和最高分
+  try {
+    best = parseInt(localStorage.getItem('snake_best') || '0', 10);
+    const saved = localStorage.getItem('snake_settings');
+    if (saved) {
+      const s = JSON.parse(saved);
+      if (s.baseSpeed) baseSpeed = s.baseSpeed;
+      if (typeof s.speedUpEnabled === 'boolean') speedUpEnabled = s.speedUpEnabled;
+      if (s.speedUpStep) speedUpStep = s.speedUpStep;
+      if (s.minSpeed) minSpeed = s.minSpeed;
+    }
+  } catch(e) { best = 0; }
+  if (isNaN(best)) best = 0;
+
+  // 同步设置面板输入框的初始值
+  function syncSettingsUI() {
+    baseSpeedInput.value = baseSpeed;
+    speedUpCheck.checked = speedUpEnabled;
+    speedUpStepInput.value = speedUpStep;
+    minSpeedInput.value = minSpeed;
+  }
+
+  // 根据当前分数计算速度档位（1 起）
+  function speedLevel() {
+    if (!speedUpEnabled) return 1;
+    return Math.floor(score / 100) + 1;
+  }
+
+  // 根据分数算出当前应有的间隔
+  function computeInterval() {
+    let interval = baseSpeed;
+    if (speedUpEnabled) {
+      const stepCount = Math.floor(score / 100);
+      interval = baseSpeed - stepCount * speedUpStep;
+      if (interval < minSpeed) interval = minSpeed;
+    }
+    return interval;
+  }
+
+  function initBoard() {
+    if (timer) { clearInterval(timer); timer = null; }
+    snake = [{x: 10, y: 10}, {x: 9, y: 10}, {x: 8, y: 10}];
+    dir = {x: 1, y: 0};
+    nextDir = {x: 1, y: 0};
+    score = 0;
+    gameOver = false;
+    paused = false;
+    won = false;
+    phase = 'idle';
+    countdown = 0;
+    currentInterval = computeInterval();
+    pauseBtn.textContent = '暂停';
+    placeFood();
+    updateUI();
+    draw();
+    showOverlay('点击开始');
+  }
+
+  function beginGame() {
+    if (phase === 'running' || phase === 'countdown') return;
+    if (phase === 'over' || gameOver) {
+      initBoard();
+    }
+    hideOverlay();
+    phase = 'countdown';
+    countdown = 3;
+    draw();
+    if (timer) clearInterval(timer);
+    timer = setInterval(countdownTick, 1000);
+  }
+
+  function countdownTick() {
+    if (phase !== 'countdown') return;
+    countdown--;
+    draw();
+    if (countdown <= 0) {
+      clearInterval(timer);
+      timer = null;
+      phase = 'running';
+      startTimer();
+      draw();
+    }
+  }
+
+  function startTimer() {
+    if (timer) clearInterval(timer);
+    currentInterval = computeInterval();
+    timer = setInterval(tick, currentInterval);
+  }
+
+  // 分数变化后，如果速度档位变了，重设定时器
+  function checkSpeedChange() {
+    const newInterval = computeInterval();
+    if (newInterval !== currentInterval) {
+      currentInterval = newInterval;
+      if (phase === 'running') {
+        if (timer) clearInterval(timer);
+        timer = setInterval(tick, currentInterval);
+      }
+    }
+  }
+
+  function placeFood() {
+    const empty = [];
+    for (let y = 0; y < ROWS; y++)
+      for (let x = 0; x < COLS; x++)
+        if (!snake.some(s => s.x === x && s.y === y)) empty.push({x, y});
+    if (empty.length === 0) { won = true; endGame(); return; }
+    food = empty[Math.floor(Math.random() * empty.length)];
+  }
+
+  function tick() {
+    if (phase !== 'running') return;
+
+    if (nextDir.x !== -dir.x || nextDir.y !== -dir.y) dir = nextDir;
+
+    const head = {x: snake[0].x + dir.x, y: snake[0].y + dir.y};
+
+    if (head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS) {
+      endGame(); return;
+    }
+    const willEat = (head.x === food.x && head.y === food.y);
+    const bodyToCheck = willEat ? snake : snake.slice(0, -1);
+    if (bodyToCheck.some(s => s.x === head.x && s.y === head.y)) {
+      endGame(); return;
+    }
+
+    snake.unshift(head);
+    if (willEat) {
+      const prevLevel = speedLevel();
+      score += 10;
+      updateUI();
+      checkSpeedChange();          // 加速检测
+      const newLevel = speedLevel();
+      if (newLevel > prevLevel) flashSpeedUp();
+      placeFood();
+      if (gameOver) return;
+    } else {
+      snake.pop();
+    }
+    draw();
+  }
+
+  // 速度提升时，右下角短暂提示
+  let speedFlashUntil = 0;
+  function flashSpeedUp() {
+    speedFlashUntil = Date.now() + 800;
+    draw();
+    setTimeout(() => { if (Date.now() >= speedFlashUntil) draw(); }, 850);
+  }
+
+  function endGame() {
+    gameOver = true;
+    phase = 'over';
+    if (timer) { clearInterval(timer); timer = null; }
+    if (score > best) {
+      best = score;
+      try { localStorage.setItem('snake_best', String(best)); } catch(e) {}
+    }
+    updateUI();
+    draw();
+    showOverlay('点击重新开始');
+  }
+
+  function updateUI() {
+    scoreDisplay.textContent = score;
+    bestDisplay.textContent = best;
+    speedDisplay.textContent = speedLevel();
+  }
+
+  function draw() {
+    ctx.fillStyle = '#0d0f12';
+    ctx.fillRect(0, 0, 400, 400);
+
+    ctx.strokeStyle = '#1c2028';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= COLS; i++) {
+      ctx.beginPath(); ctx.moveTo(i*CELL, 0); ctx.lineTo(i*CELL, ROWS*CELL); ctx.stroke();
+    }
+    for (let i = 0; i <= ROWS; i++) {
+      ctx.beginPath(); ctx.moveTo(0, i*CELL); ctx.lineTo(COLS*CELL, i*CELL); ctx.stroke();
+    }
+
+    if (food) {
+      ctx.fillStyle = '#ff6f61';
+      ctx.fillRect(food.x*CELL + 2, food.y*CELL + 2, CELL - 4, CELL - 4);
+    }
+
+    snake.forEach((seg, i) => {
+      ctx.fillStyle = i === 0 ? '#7ee0a0' : '#5cdb95';
+      ctx.fillRect(seg.x*CELL + 1, seg.y*CELL + 1, CELL - 2, CELL - 2);
+      if (i === 0) {
+        ctx.strokeStyle = '#2d7a4a';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(seg.x*CELL + 1, seg.y*CELL + 1, CELL - 2, CELL - 2);
+      }
+    });
+
+    // 速度提升提示
+    if (Date.now() < speedFlashUntil) {
+      ctx.fillStyle = '#ffd966';
+      ctx.font = 'bold 22px Arial, sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('加速！', 200, 40);
+    }
+
+    if (phase === 'countdown' && countdown > 0) {
+      ctx.fillStyle = 'rgba(0,0,0,.5)';
+      ctx.fillRect(0, 0, 400, 400);
+      ctx.font = 'bold 72px Arial, sans-serif';
+      ctx.fillStyle = '#e0e0e0';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(String(countdown), 200, 200);
+    }
+
+    if (gameOver) {
+      ctx.fillStyle = 'rgba(0,0,0,.75)';
+      ctx.fillRect(0, 0, 400, 400);
+      ctx.font = 'bold 28px Arial, sans-serif';
+      ctx.fillStyle = '#e0e0e0';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(won ? '通关！' : '游戏结束', 200, 200);
+    } else if (paused) {
+      ctx.fillStyle = 'rgba(0,0,0,.65)';
+      ctx.fillRect(0, 0, 400, 400);
+      ctx.font = 'bold 30px Arial, sans-serif';
+      ctx.fillStyle = '#d0d0d0';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('暂停', 200, 200);
+    }
+  }
+
+  function showOverlay(text) {
+    startOverlay.textContent = text;
+    startOverlay.classList.remove('hidden');
+  }
+  function hideOverlay() {
+    startOverlay.classList.add('hidden');
+  }
+
+  function setDir(x, y) {
+    if (phase !== 'running') return;
+    if (x === -dir.x && y === -dir.y) return;
+    nextDir = {x, y};
+  }
+
+  function togglePause() {
+    if (phase === 'running') {
+      phase = 'paused';
+      paused = true;
+      pauseBtn.textContent = '继续';
+      if (timer) { clearInterval(timer); timer = null; }
+      draw();
+    } else if (phase === 'paused') {
+      phase = 'running';
+      paused = false;
+      pauseBtn.textContent = '暂停';
+      startTimer();
+      draw();
+    }
+  }
+
+  function resetGame() {
+    if (timer) { clearInterval(timer); timer = null; }
+    initBoard();
+  }
+
+  // ---- 设置面板逻辑 ----
+  function openSettings() {
+    syncSettingsUI();
+    settingsOverlay.classList.remove('hidden');
+    // 打开设置时暂停游戏
+    if (phase === 'running') {
+      phase = 'paused';
+      paused = true;
+      pauseBtn.textContent = '继续';
+      if (timer) { clearInterval(timer); timer = null; }
+      draw();
+    }
+  }
+  function closeSettings(save) {
+    if (save) {
+      const bs = parseInt(baseSpeedInput.value, 10);
+      const st = parseInt(speedUpStepInput.value, 10);
+      const ms = parseInt(minSpeedInput.value, 10);
+      if (!isNaN(bs) && bs >= 80 && bs <= 500) baseSpeed = bs;
+      if (!isNaN(st) && st >= 5 && st <= 80) speedUpStep = st;
+      if (!isNaN(ms) && ms >= 60 && ms <= 300) minSpeed = ms;
+      speedUpEnabled = speedUpCheck.checked;
+      // 存到本地
+      try {
+        localStorage.setItem('snake_settings', JSON.stringify({
+          baseSpeed, speedUpEnabled, speedUpStep, minSpeed
+        }));
+      } catch(e) {}
+      // 应用新速度
+      currentInterval = computeInterval();
+      updateUI();
+      if (phase === 'paused') {
+        // 保持暂停状态，等用户点继续
+      }
+      draw();
+    }
+    settingsOverlay.classList.add('hidden');
+  }
+
+  // ---- 事件绑定 ----
+  startOverlay.addEventListener('click', beginGame);
+  startOverlay.addEventListener('touchstart', (e) => { e.preventDefault(); beginGame(); }, { passive: false });
+
+  function bindDir(btn, x, y) {
+    const handler = (e) => { e.preventDefault(); setDir(x, y); };
+    btn.addEventListener('touchstart', handler, { passive: false });
+    btn.addEventListener('click', handler);
+  }
+  bindDir(upBtn, 0, -1);
+  bindDir(downBtn, 0, 1);
+  bindDir(leftBtn, -1, 0);
+  bindDir(rightBtn, 1, 0);
+
+  pauseBtn.addEventListener('click', togglePause);
+  resetBtn.addEventListener('click', resetGame);
+  settingsBtn.addEventListener('click', openSettings);
+  pauseBtn.addEventListener('touchstart', (e) => { e.preventDefault(); togglePause(); }, { passive: false });
+  resetBtn.addEventListener('touchstart', (e) => { e.preventDefault(); resetGame(); }, { passive: false });
+  settingsBtn.addEventListener('touchstart', (e) => { e.preventDefault(); openSettings(); }, { passive: false });
+
+  settingsCancel.addEventListener('click', () => closeSettings(false));
+  settingsConfirm.addEventListener('click', () => closeSettings(true));
+  settingsCancel.addEventListener('touchstart', (e) => { e.preventDefault(); closeSettings(false); }, { passive: false });
+  settingsConfirm.addEventListener('touchstart', (e) => { e.preventDefault(); closeSettings(true); }, { passive: false });
+
+  window.addEventListener('keydown', (e) => {
+    const k = e.key;
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(k)) e.preventDefault();
+    if (!settingsOverlay.classList.contains('hidden')) return;  // 设置面板打开时不响应游戏按键
+    if (k === ' ') {
+      if (phase === 'idle' || phase === 'over') beginGame();
+      else togglePause();
+      return;
+    }
+    if (k === 'ArrowUp') setDir(0, -1);
+    else if (k === 'ArrowDown') setDir(0, 1);
+    else if (k === 'ArrowLeft') setDir(-1, 0);
+    else if (k === 'ArrowRight') setDir(1, 0);
+  });
+
+  window.addEventListener('beforeunload', () => { if (timer) clearInterval(timer); });
+
+  // 启动
+  initBoard();
+})();
+</script>
+</body>
+</html>

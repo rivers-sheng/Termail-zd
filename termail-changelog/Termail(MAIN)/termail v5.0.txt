@@ -1,0 +1,219 @@
+Termail v4 → v5 更新说明
+版本号：4.0.0 → 5.0.0（CMake / AndroidManifest / main.cpp 同步升级）
+
+一、新增
+命令类
+
+license：新增独立命令，读取资源内 :/LICENSE/GPL.txt 输出 GPL 许可证全文
+
+cmenu：新增命令，输出一份完整的手写命令清单（覆盖全部命令及说明），与 help 的动态列表互补
+
+setfont <字号>：运行中直接调整输出区/输入框/提示符字号（限制 8–32）
+
+addcmd <名> <命令> [描述]：命令行直接新增自定义命令并落盘
+
+delcmd <名>：命令行删除自定义命令
+
+listcmd：列出自定义命令
+
+mine：扫雷进入纯命令行模式，支持 mine new/easy/medium/hard、mine A1 揭格
+
+flag <坐标>：扫雷插旗命令
+
+文件/资源
+
+新增 LICENSE/GPL.txt 资源，并加入 qt_add_resources
+
+新增 commands/cmenu.cpp 源文件
+
+扫雷引擎（重构后新形态）
+
+MinesweeperEngine 类：棋盘以文本表格（┌─┬─┐ 边框 + A–P 行号 + 1–16 列号）渲染到终端输出区，不再是按钮网格
+
+init / render / reveal / flag / checkWin 完整命令行接口
+
+终端交互
+
+Ctrl+L 清屏快捷键（setupShortcuts() 统一注册快捷键）
+
+输入行改为 promptLabel + inputField 同一水平行布局
+
+二、修改
+架构级改动（影响面最大）
+
+主 UI 类由 TerminalUI : QMainWindow（带菜单栏、工具栏、多窗口）改为 TerminalWidget : QWidget（纯终端控件）
+
+文件路径 ui/terminal_ui.* → terminal/terminal.*，类名 TerminalUI → TerminalWidget
+
+命令注册函数签名全部由 TerminalUI* 改为 TerminalWidget*
+
+appendOutput 第二参数由 const QString& color 改为 const QColor& color
+
+颜色常量体系更换：THEME.xxx.name() → BG_COLOR / FG_COLOR / PROMPT_COLOR / ERROR_COLOR / INFO_COLOR / ACCENT_COLOR
+
+字体配置简化：TERMINAL_FONT 字体对象 → FONT_FAMILY + FONT_SIZE 常量（字号 11 → 12）
+
+Utils 与 CommandHelper 合并：CommandHelper 的实现移到 utils.cpp，声明从 commands.h 移到 utils.h；Utils 删除 removeDir、runShell 等未用接口
+
+commands.h 不再声明 CommandHelper 命名空间，也不再 include QProcess/QDir/QFileInfo/QStorageInfo 等（精简头文件依赖）
+
+启动流程
+
+v4：启动检测管理员权限，弹窗询问是否提权重启（Windows ShellExecuteExW、Linux pkexec/sudo、macOS osascript），标题区分「管理员/受限模式」
+
+v5：完全移除管理员权限检测与提权逻辑，main.cpp 仅创建并显示 TerminalWidget
+
+移除 ensureConfigDir() 与默认配置拷贝逻辑
+
+移除 QApplication::setAttribute(AA_EnableHighDpiScaling/UseHighDpiPixmaps)（Qt5 兼容分支）
+
+菜单与窗口功能（整体删除）
+
+删除整个菜单栏：文件/编辑/视图/工具/帮助 五级菜单及全部 Action
+
+删除 newWindow、openDirectory、copyText、pasteText、fontSettings、openCalculator、openCustomCommandsDialog、showHistoryWindow、showHelp、showShortcuts、showAbout、onStopProcess
+
+删除 GUI 计算器对话框（原 openCalculator）
+
+删除自定义命令管理对话框 CustomCommandsDialog（customcmd/ 整个目录下线），改为 addcmd/delcmd/listcmd 命令行管理
+
+删除 GUI 扫雷对话框（原 MinesweeperGame : QDialog 的按钮棋盘），改为命令行引擎
+
+删除停止进程按钮 stopBtn 与 onStopProcess
+
+欢迎信息重写：去掉管理员模式提示、版本横幅改为简洁版，新增 GPL 版权行与 cmenu 提示
+
+which 命令逻辑
+
+v4：先查内置命令表，未命中再用 QStandardPaths::findExecutable 查系统路径
+
+v5：改为 if (true) { 输出"内置命令"; return; }，后面的系统路径查找成为死代码（功能退化，只报内置）
+
+calc 命令实现
+
+v4：调用 python3 -c "print(expr)" 计算
+
+v5：改用 shell 算术 echo $(( expr ))，依赖 sh 的整数运算
+
+watch 命令实现
+
+v4：QTimer 异步、2 秒间隔、3 次后自停
+
+v5：改为同步 QThread::sleep(2) 循环 3 次（会阻塞 UI）
+
+rm / rmdir / touch / cp / mv / rename 等
+
+失败分支大多删除，不再输出"删除失败/移动失败"等错误提示，仅成功时输出
+
+rmdir 改用 QDir().rmdir(...)
+
+touch 删除了父目录自动创建逻辑
+
+ls 长格式列宽由 %1 单参改为 %1/%2 双参对齐
+
+math 类命令
+
+morse 码表大幅缩减（仅保留 A/B/C/S/O/空格），其余字符原样输出
+
+ascii 删除 fish、dragon 两个图案
+
+prime 改为边算边输出，末尾再报总数
+
+hash 去掉 SHA512，只保留 MD5 / SHA256
+
+网络命令
+
+ifconfig：v4 先尝试系统 ifconfig/ipconfig，再追加 Qt 接口信息；v5 只输出 Qt QNetworkInterface 信息，不再调系统命令
+
+ipconfig：v5 直接转发到 ifconfig
+
+ping：v5 固定 ping（不再按平台分支）
+
+tracert：v5 统一用 traceroute（不再区分 Windows tracert）
+
+netstat / arp / route：v5 去除 #ifdef Q_OS_WIN 平台分支，默认参数改为 Linux 风格（-an / -a）
+
+wget：v5 只走 Qt 内置下载，不再优先调系统 wget
+
+nslookup / whois：简化输出，去掉服务器名等额外信息
+
+系统命令
+
+help：输出标题由「Termail终端 命令列表」改为「Termail命令列表」，去掉末尾"输入命令名查看详细帮助"
+
+time：v4 转发 date；v5 独立输出 hh:mm:ss
+
+ps / tasklist：v5 统一走 ps aux（去掉 Windows tasklist 分支）
+
+kill / taskkill：v5 统一走 kill（去掉 Windows 分支）
+
+vim：v5 提示「简易Vim不可用，请用cat查看文件」
+
+reset：v5 归入清屏组，与 clear/cls 一致
+
+删除 set、script 行为变化（v5 仅打印提示）
+
+AndroidManifest
+
+versionCode 1 → 5，versionName 4.0.0 → 5.0.0
+
+应用标签 Termail_v4 → Termail_v5
+
+屏幕方向 landscape → unspecified（允许竖屏）
+
+删除权限：ACCESS_WIFI_STATE、MANAGE_EXTERNAL_STORAGE、READ_PHONE_STATE、FOREGROUND_SERVICE
+
+configChanges 增加 smallestScreenSize|density
+
+删除 android:theme、android:icon、android:supportsRtl、extractNativeLibs、launchMode、windowSoftInputMode、qt_sources 等 meta-data 与 supports-screens 块
+
+CMakeLists
+
+版本 4.0.0 → 5.0.0
+
+源文件：ui/terminal_ui.cpp → terminal/terminal.cpp；新增 commands/cmenu.cpp；删除 games/minesweeper.cpp（GUI 版）、customcmd/custom_commands_dialog.cpp
+
+头文件同步：删除 ui/terminal_ui.h、customcmd/custom_commands_dialog.h
+
+资源：新增 LICENSE/GPL.txt；resources/custom_commands.json 保留
+
+移除 CMAKE_AUTOUIC，移除 WIN32_EXECUTABLE / MACOSX_BUNDLE / 安装规则等平台块（仅保留 ANDROID 块）
+
+include 目录去掉 ui、customcmd
+
+config.h
+
+版本 4.0.0 → 5.0.0
+
+主题结构体 ThemeColors THEME 删除，改为扁平颜色常量
+
+删除 APP_AUTHOR、DEFAULT_CONFIG_PATH、TITLE_FONT、MinesweeperConfig MINESWEEPER_CFG、CommandType 枚举、CommandInfo 结构、EASTER_EGG_*（彩蛋词移入 terminal.cpp 硬编码）
+
+新增扫雷默认值常量 MINE_EASY_* / MINE_MED_* / MINE_HARD_*
+
+字体字号 11 → 12
+
+彩蛋
+
+v4：game/play/xyzzy 或科乐美秘技触发 GUI 扫雷窗口
+
+v5：同样词触发 命令行扫雷（executeInternalCommand("mine")），且字符串比对改为 上上下下左右左右ba（原为 上上下下左右左右ba，写法一致但位置从 config.h 移入 terminal.cpp）
+
+三、其他 / 删除
+删除 customcmd/ 整个模块（对话框 UI 化配置）
+
+删除 games/minesweeper 的 QDialog 按钮版，同名文件改为命令行引擎（头文件改为 class MinesweeperEngine）
+
+commands.h 中 CommandHelper 声明移除，commands.cpp 去掉对应实现
+
+Utils::removeDir、Utils::runShell 删除
+
+TerminalUI::getHistory 保留，history 导航逻辑基本不变
+
+Tab 补全在 v5 只补命令名，删除文件路径补全
+
+appendOutput 在 v5 中当颜色等于 FG_COLOR 时走 insertPlainText（避免多余 HTML），其他颜色仍走 insertHtml
+
+管道 executePipeline 逻辑重写：v5 在最后一段才输出 stderr，且输入注入时机改为 i > 0 后统一写
+
+file_commands.cpp 顶部出现重复 #include <QStorageInfo>（两行），属笔误级冗余

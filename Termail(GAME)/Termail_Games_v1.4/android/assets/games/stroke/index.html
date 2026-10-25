@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>一笔画</title>
+<style>
+  * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #15171c;
+    font-family: Arial, "Microsoft YaHei", sans-serif;
+    overflow: hidden;
+  }
+  body { display: flex; justify-content: center; align-items: center; padding: 6px; }
+
+  .game-container {
+    background: #1d2026;
+    border: 1px solid #333842;
+    padding: 8px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    width: 100%; height: 100%;
+    max-width: 460px;
+  }
+
+  .top-row { display: flex; gap: 6px; width: 100%; flex: 0 0 auto; }
+  .info-box {
+    flex: 1;
+    background: #14161a; border: 1px solid #333842;
+    padding: 4px 10px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .info-box .label { color: #6c7484; font-size: 12px; }
+  .info-box .value { color: #d8d8d8; font-size: 18px; font-weight: bold; }
+
+  .board-wrap {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+  }
+  canvas#board {
+    display: block;
+    background: #0d0f12;
+    border: 1px solid #333842;
+    touch-action: none;
+  }
+
+  .touch-controls { width: 100%; display: flex; flex-direction: column; gap: 5px; flex: 0 0 auto; }
+  .control-row { display: flex; gap: 5px; }
+  .touch-btn {
+    flex: 1;
+    background: #262a32; border: 1px solid #3a404b; color: #cfd4dc;
+    border-radius: 4px; font-size: 14px; font-family: inherit;
+    padding: 11px 0; cursor: pointer;
+  }
+  .touch-btn:active { background: #313742; }
+  .touch-btn.small { font-size: 12px; }
+
+  .hint {
+    text-align: center;
+    color: #6c7484;
+    font-size: 11px;
+    letter-spacing: 1px;
+    margin-top: 2px;
+  }
+
+  .overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.7);
+    display: flex; justify-content: center; align-items: center;
+    z-index: 10;
+  }
+  .overlay.hidden { display: none; }
+  .panel {
+    background: #1d2026; border: 1px solid #3a404b; border-radius: 8px;
+    padding: 20px 24px; min-width: 250px; max-width: 90%;
+    color: #cfd4dc; font-size: 14px;
+  }
+  .panel h3 { margin: 0 0 16px; font-size: 16px; color: #e0e0e0; text-align: center; font-weight: normal; letter-spacing: 2px; }
+  .level-btn {
+    display: block; width: 100%; margin-bottom: 8px;
+    background: #262a32; border: 1px solid #3a404b; color: #cfd4dc;
+    border-radius: 4px; padding: 11px 0; font-family: inherit; font-size: 14px; cursor: pointer;
+  }
+  .level-btn.active { background: #3a4f6b; border-color: #5a7aa0; color: #d8e6ff; }
+  .level-btn:active { background: #313742; }
+  .panel .close { margin-top: 12px; }
+</style>
+</head>
+<body>
+<div class="game-container">
+  <div class="top-row">
+    <div class="info-box">
+      <span class="label">关卡</span>
+      <span class="value" id="levelDisplay">1</span>
+    </div>
+    <div class="info-box">
+      <span class="label">进度</span>
+      <span class="value" id="progressDisplay">0/0</span>
+    </div>
+    <div class="info-box">
+      <span class="label">尺寸</span>
+      <span class="value" id="sizeDisplay" style="font-size:14px;">5×5</span>
+    </div>
+  </div>
+
+  <div class="board-wrap">
+    <canvas id="board"></canvas>
+  </div>
+
+  <div class="touch-controls">
+    <div class="control-row">
+      <button class="touch-btn" id="undoBtn">撤销一步</button>
+      <button class="touch-btn small" id="restartBtn">重走</button>
+      <button class="touch-btn small" id="sizeBtn">选尺寸</button>
+      <button class="touch-btn small" id="nextBtn">下一关</button>
+    </div>
+    <div class="hint">从任一节点开始，不抬笔走完所有边</div>
+  </div>
+</div>
+
+<div class="overlay hidden" id="sizeOverlay">
+  <div class="panel">
+    <h3>选择尺寸</h3>
+    <button class="level-btn" data-size="3">3 × 3 · 简单</button>
+    <button class="level-btn" data-size="4">4 × 4 · 中等</button>
+    <button class="level-btn" data-size="5">5 × 5 · 困难</button>
+    <button class="level-btn close" id="sizeClose">取消</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  const boardCanvas = document.getElementById('board');
+  const ctx = boardCanvas.getContext('2d');
+  const wrap = boardCanvas.parentElement;
+  const levelDisplay = document.getElementById('levelDisplay');
+  const progressDisplay = document.getElementById('progressDisplay');
+  const sizeDisplay = document.getElementById('sizeDisplay');
+  const undoBtn = document.getElementById('undoBtn');
+  const restartBtn = document.getElementById('restartBtn');
+  const sizeBtn = document.getElementById('sizeBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  const sizeOverlay = document.getElementById('sizeOverlay');
+  const sizeClose = document.getElementById('sizeClose');
+
+  let N = 5;
+  let nodes = [];
+  let edges = [];
+  let adj = [];
+  let drawnEdges = [];
+  let current = -1;
+  let pathNodes = [];
+  let won = false;
+  let cellSize = 60;
+  let level = 1;
+
+  const MARGIN = 40;
+
+  function allPossibleEdges() {
+    const list = [];
+    const idx = (r, c) => r * N + c;
+    for (let r = 0; r < N; r++) {
+      for (let c = 0; c < N; c++) {
+        if (c < N - 1) list.push([idx(r, c), idx(r, c + 1)]);
+        if (r < N - 1) list.push([idx(r, c), idx(r + 1, c)]);
+      }
+    }
+    return list;
+  }
+
+  function isConnected(edgeList) {
+    if (edgeList.length === 0) return false;
+    const adjL = {};
+    const used = new Set();
+    for (const [a, b] of edgeList) {
+      (adjL[a] = adjL[a] || []).push(b);
+      (adjL[b] = adjL[b] || []).push(a);
+      used.add(a); used.add(b);
+    }
+    const start = edgeList[0][0];
+    const visited = new Set([start]);
+    const stack = [start];
+    while (stack.length) {
+      const u = stack.pop();
+      for (const v of adjL[u]) {
+        if (!visited.has(v)) { visited.add(v); stack.push(v); }
+      }
+    }
+    for (const n of used) if (!visited.has(n)) return false;
+    return true;
+  }
+
+  function degrees(edgeList) {
+    const deg = {};
+    for (const [a, b] of edgeList) {
+      deg[a] = (deg[a] || 0) + 1;
+      deg[b] = (deg[b] || 0) + 1;
+    }
+    return deg;
+  }
+
+  function buildEulerianGraph() {
+    const pool = allPossibleEdges();
+    const edgeSet = new Set();
+    const keyOf = (a, b) => a < b ? a + '-' + b : b + '-' + a;
+
+    const tree = randomSpanningTree(pool);
+    for (const [a, b] of tree) edgeSet.add(keyOf(a, b));
+
+    let deg = {};
+    for (const key of edgeSet) {
+      const [a, b] = key.split('-').map(Number);
+      deg[a] = (deg[a] || 0) + 1;
+      deg[b] = (deg[b] || 0) + 1;
+    }
+
+    let guard = 0;
+    while (guard++ < 5000) {
+      const oddNodes = [];
+      for (const k in deg) if (deg[k] % 2 === 1) oddNodes.push(Number(k));
+      if (oddNodes.length === 0) break;
+
+      let a = oddNodes[0];
+      let b = oddNodes[1];
+
+      const directKey = keyOf(a, b);
+      if (canConnectDirectly(a, b)) {
+        edgeSet.add(directKey);
+        deg[a]++; deg[b]++;
+        continue;
+      }
+
+      const m = findMiddle(a, b);
+      if (m !== -1) {
+        edgeSet.add(keyOf(a, m));
+        edgeSet.add(keyOf(m, b));
+        deg[a]++; deg[m] += 2; deg[b]++;
+        continue;
+      }
+
+      let swapped = false;
+      for (let i = 2; i < oddNodes.length; i++) {
+        const b2 = oddNodes[i];
+        if (canConnectDirectly(a, b2)) {
+          edgeSet.add(keyOf(a, b2));
+          deg[a]++; deg[b2]++;
+          swapped = true;
+          break;
+        }
+        const m2 = findMiddle(a, b2);
+        if (m2 !== -1) {
+          edgeSet.add(keyOf(a, m2));
+          edgeSet.add(keyOf(m2, b2));
+          deg[a]++; deg[m2] += 2; deg[b2]++;
+          swapped = true;
+          break;
+        }
+      }
+      if (!swapped) {
+        return null;
+      }
+    }
+
+    for (const k in deg) if (deg[k] % 2 === 1) return null;
+
+    const result = [];
+    for (const key of edgeSet) {
+      const [a, b] = key.split('-').map(Number);
+      result.push([a, b]);
+    }
+    return result;
+  }
+
+  function canConnectDirectly(a, b) {
+    const ar = Math.floor(a / N), ac = a % N;
+    const br = Math.floor(b / N), bc = b % N;
+    const dr = Math.abs(ar - br), dc = Math.abs(ac - bc);
+    return (dr === 1 && dc === 0) || (dr === 0 && dc === 1);
+  }
+
+  function findMiddle(a, b) {
+    const ar = Math.floor(a / N), ac = a % N;
+    const br = Math.floor(b / N), bc = b % N;
+
+    const neighborsOfA = [];
+    if (ar > 0) neighborsOfA.push(a - N);
+    if (ar < N - 1) neighborsOfA.push(a + N);
+    if (ac > 0) neighborsOfA.push(a - 1);
+    if (ac < N - 1) neighborsOfA.push(a + 1);
+
+    for (const m of neighborsOfA) {
+      if (canConnectDirectly(m, b)) return m;
+    }
+    return -1;
+  }
+
+  function randomSpanningTree(pool) {
+    const total = N * N;
+    const visited = new Set();
+    const treeEdges = [];
+    const start = Math.floor(Math.random() * total);
+    visited.add(start);
+
+    const inTree = new Set();
+    const frontier = pool.filter(([a, b]) => visited.has(a) !== visited.has(b));
+
+    while (visited.size < total && frontier.length > 0) {
+      const i = Math.floor(Math.random() * frontier.length);
+      const [a, b] = frontier.splice(i, 1)[0];
+      if (visited.has(a) && visited.has(b)) continue;
+      const newNode = visited.has(a) ? b : a;
+      if (visited.has(newNode)) continue;
+      visited.add(newNode);
+      treeEdges.push([a, b]);
+
+      frontier.length = 0;
+      for (const [x, y] of pool) {
+        const kx = x < y ? x + '-' + y : y + '-' + x;
+        if (inTree.has(kx)) continue;
+        if (visited.has(x) !== visited.has(y)) frontier.push([x, y]);
+      }
+    }
+
+    for (const [a, b] of treeEdges) {
+      inTree.add(a < b ? a + '-' + b : b + '-' + a);
+    }
+    return treeEdges;
+  }
+
+  function generateEdges() {
+    for (let attempt = 0; attempt < 300; attempt++) {
+      const euler = buildEulerianGraph();
+      if (!euler) continue;
+      if (!isConnected(euler)) continue;
+
+      if (euler.length <= 1) continue;
+      const removeIdx = Math.floor(Math.random() * euler.length);
+      const result = euler.slice(0, removeIdx).concat(euler.slice(removeIdx + 1));
+
+      const deg = degrees(result);
+      let odd = 0;
+      for (const k in deg) if (deg[k] % 2 === 1) odd++;
+      if (odd === 2 && isConnected(result)) {
+        return result;
+      }
+    }
+    return fallbackChain();
+  }
+
+  function fallbackChain() {
+    const chain = [];
+    const idx = (r, c) => r * N + c;
+    for (let r = 0; r < N; r++) {
+      if (r % 2 === 0) {
+        for (let c = 0; c < N - 1; c++) chain.push([idx(r, c), idx(r, c + 1)]);
+        if (r < N - 1) chain.push([idx(r, N - 1), idx(r + 1, N - 1)]);
+      } else {
+        for (let c = N - 1; c > 0; c--) chain.push([idx(r, c), idx(r, c - 1)]);
+        if (r < N - 1) chain.push([idx(r, 0), idx(r + 1, 0)]);
+      }
+    }
+    return chain;
+  }
+
+  function generateLevel() {
+    nodes = [];
+    for (let r = 0; r < N; r++)
+      for (let c = 0; c < N; c++)
+        nodes.push({ r, c });
+
+    const chosen = generateEdges();
+    const seen = new Set();
+    const clean = [];
+    for (const [a, b] of chosen) {
+      const key = a < b ? a + '-' + b : b + '-' + a;
+      if (!seen.has(key)) { seen.add(key); clean.push([a, b]); }
+    }
+
+    edges = clean.map(([a, b]) => ({ a, b, used: false }));
+
+    adj = Array.from({ length: N * N }, () => []);
+    edges.forEach((e, i) => {
+      adj[e.a].push({ to: e.b, edge: i });
+      adj[e.b].push({ to: e.a, edge: i });
+    });
+
+    drawnEdges = [];
+    pathNodes = [];
+    current = -1;
+    won = false;
+    updateUI();
+    computeCellSize();
+    draw();
+    requestAnimationFrame(() => { computeCellSize(); draw(); });
+  }
+
+  function computeCellSize() {
+    const maxW = wrap.clientWidth;
+    const maxH = wrap.clientHeight;
+    const availW = maxW > 0 ? maxW : Math.min(window.innerWidth - 30, 440);
+    const availH = maxH > 0 ? maxH : Math.min(window.innerHeight - 280, 520);
+    const usable = Math.min(availW, availH) - MARGIN * 2;
+    const s = Math.floor(usable / (N - 1));
+    cellSize = Math.max(30, Math.min(s, 110));
+
+    const cw = (N - 1) * cellSize + MARGIN * 2;
+    const ch = (N - 1) * cellSize + MARGIN * 2;
+    if (boardCanvas.width !== cw || boardCanvas.height !== ch) {
+      boardCanvas.width = cw;
+      boardCanvas.height = ch;
+    }
+    boardCanvas.style.width = cw + 'px';
+    boardCanvas.style.height = ch + 'px';
+  }
+
+  function nodeXY(i) {
+    const n = nodes[i];
+    return {
+      x: MARGIN + n.c * cellSize,
+      y: MARGIN + n.r * cellSize
+    };
+  }
+
+  function draw() {
+    const W = boardCanvas.width, H = boardCanvas.height;
+    if (W === 0 || H === 0) return;
+
+    ctx.fillStyle = '#0d0f12';
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.lineCap = 'round';
+
+    for (const e of edges) {
+      if (e.used) continue;
+      const a = nodeXY(e.a), b = nodeXY(e.b);
+      ctx.strokeStyle = '#2f3644';
+      ctx.lineWidth = Math.max(4, cellSize * 0.14);
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+    }
+
+    for (const e of edges) {
+      if (!e.used) continue;
+      const a = nodeXY(e.a), b = nodeXY(e.b);
+      ctx.strokeStyle = '#5d9df9';
+      ctx.lineWidth = Math.max(5, cellSize * 0.18);
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+    }
+
+    for (let i = 0; i < nodes.length; i++) {
+      if (adj[i].length === 0) continue;
+      const p = nodeXY(i);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, Math.max(5, cellSize * 0.13), 0, Math.PI * 2);
+      ctx.fillStyle = '#1d2026';
+      ctx.fill();
+      ctx.strokeStyle = '#6c7484';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      if (current === i && !won) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, Math.max(7, cellSize * 0.18), 0, Math.PI * 2);
+        ctx.fillStyle = '#7ee0a0';
+        ctx.fill();
+      }
+    }
+
+    if (won) {
+      ctx.fillStyle = 'rgba(0,0,0,.72)';
+      ctx.fillRect(0, 0, W, H);
+      ctx.font = 'bold ' + Math.floor(Math.min(W, H) * 0.1) + 'px Arial, sans-serif';
+      ctx.fillStyle = '#7ee0a0';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('走通了！', W/2, H/2);
+    }
+  }
+
+  function updateUI() {
+    const used = edges.filter(e => e.used).length;
+    progressDisplay.textContent = used + '/' + edges.length;
+    levelDisplay.textContent = level;
+    sizeDisplay.textContent = N + '×' + N;
+  }
+
+  let touchUsed = false;
+
+  function getNodeFromEvent(e) {
+    const rect = boardCanvas.getBoundingClientRect();
+    let clientX, clientY;
+    if (e.changedTouches && e.changedTouches.length) {
+      clientX = e.changedTouches[0].clientX;
+      clientY = e.changedTouches[0].clientY;
+    } else if (e.touches && e.touches.length) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+    const x = (clientX - rect.left) / rect.width * boardCanvas.width;
+    const y = (clientY - rect.top) / rect.height * boardCanvas.height;
+
+    let best = -1, bestDist = Infinity;
+    for (let i = 0; i < nodes.length; i++) {
+      if (adj[i].length === 0) continue;
+      const p = nodeXY(i);
+      const d = Math.hypot(x - p.x, y - p.y);
+      if (d < bestDist) { bestDist = d; best = i; }
+    }
+    const threshold = Math.max(20, cellSize * 0.4);
+    if (bestDist > threshold) return -1;
+    return best;
+  }
+
+  function handleNodeInput(idx) {
+    if (won || idx < 0) return;
+    if (current === -1) {
+      current = idx;
+      pathNodes = [idx];
+      draw();
+      updateUI();
+      return;
+    }
+    if (idx === current) return;
+
+    const link = adj[current].find(l => l.to === idx && !edges[l.edge].used);
+    if (!link) return;
+
+    edges[link.edge].used = true;
+    drawnEdges.push(link.edge);
+    current = idx;
+    pathNodes.push(idx);
+
+    draw();
+    updateUI();
+    checkWin();
+  }
+
+  function checkWin() {
+    if (edges.every(e => e.used)) {
+      won = true;
+      draw();
+    }
+  }
+
+  boardCanvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    touchUsed = true;
+    handleNodeInput(getNodeFromEvent(e));
+  }, { passive: false });
+
+  boardCanvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    const idx = getNodeFromEvent(e);
+    if (idx >= 0 && idx !== current && current >= 0) {
+      const link = adj[current].find(l => l.to === idx && !edges[l.edge].used);
+      if (link) handleNodeInput(idx);
+    }
+  }, { passive: false });
+
+  boardCanvas.addEventListener('touchend', (e) => { e.preventDefault(); }, { passive: false });
+
+  boardCanvas.addEventListener('mousedown', (e) => {
+    if (touchUsed) return;
+    handleNodeInput(getNodeFromEvent(e));
+  });
+  boardCanvas.addEventListener('mouseup', () => { touchUsed = false; });
+
+  function undo() {
+    if (won || drawnEdges.length === 0) return;
+    const last = drawnEdges.pop();
+    edges[last].used = false;
+    pathNodes.pop();
+    current = pathNodes[pathNodes.length - 1];
+    draw();
+    updateUI();
+  }
+  undoBtn.addEventListener('click', undo);
+  undoBtn.addEventListener('touchstart', (e) => { e.preventDefault(); undo(); }, { passive: false });
+
+  function restart() {
+    for (const e of edges) e.used = false;
+    drawnEdges = [];
+    pathNodes = [];
+    current = -1;
+    won = false;
+    draw();
+    updateUI();
+  }
+  restartBtn.addEventListener('click', restart);
+  restartBtn.addEventListener('touchstart', (e) => { e.preventDefault(); restart(); }, { passive: false });
+
+  function nextLevel() {
+    level++;
+    generateLevel();
+  }
+  nextBtn.addEventListener('click', nextLevel);
+  nextBtn.addEventListener('touchstart', (e) => { e.preventDefault(); nextLevel(); }, { passive: false });
+
+  function openSize() {
+    sizeOverlay.querySelectorAll('.level-btn[data-size]').forEach(btn => {
+      btn.classList.toggle('active', parseInt(btn.dataset.size, 10) === N);
+    });
+    sizeOverlay.classList.remove('hidden');
+  }
+  sizeBtn.addEventListener('click', openSize);
+  sizeBtn.addEventListener('touchstart', (e) => { e.preventDefault(); openSize(); }, { passive: false });
+
+  sizeOverlay.querySelectorAll('.level-btn[data-size]').forEach(btn => {
+    const handler = (e) => {
+      e.preventDefault();
+      N = parseInt(btn.dataset.size, 10);
+      if (isNaN(N) || N < 3 || N > 10) N = 5; // 兜底防错
+      sizeOverlay.classList.add('hidden');
+      level = 1;
+      generateLevel();
+    };
+    btn.addEventListener('click', handler);
+    btn.addEventListener('touchstart', handler, { passive: false });
+  });
+  sizeClose.addEventListener('click', () => sizeOverlay.classList.add('hidden'));
+  sizeClose.addEventListener('touchstart', (e) => { e.preventDefault(); sizeOverlay.classList.add('hidden'); }, { passive: false });
+
+  window.addEventListener('resize', () => { computeCellSize(); draw(); });
+  window.addEventListener('orientationchange', () => { setTimeout(() => { computeCellSize(); draw(); }, 200); });
+
+  generateLevel();
+})();
+</script>
+</body>
+</html>

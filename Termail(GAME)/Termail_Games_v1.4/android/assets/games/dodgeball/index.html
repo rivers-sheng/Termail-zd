@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>躲避球</title>
+<style>
+  * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #15171c;
+    font-family: Arial, "Microsoft YaHei", sans-serif;
+    overflow: hidden;
+  }
+  body { display: flex; justify-content: center; align-items: center; padding: 6px; }
+
+  .game-container {
+    background: #1d2026;
+    border: 1px solid #333842;
+    padding: 8px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    width: 100%; height: 100%;
+    max-width: 460px;
+  }
+
+  .top-row { display: flex; gap: 6px; width: 100%; flex: 0 0 auto; }
+  .info-box {
+    flex: 1;
+    background: #14161a; border: 1px solid #333842;
+    padding: 4px 10px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .info-box .label { color: #6c7484; font-size: 12px; }
+  .info-box .value { color: #d8d8d8; font-size: 18px; font-weight: bold; }
+
+  .board-wrap {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+  }
+  canvas#board {
+    display: block;
+    background: #0d0f12;
+    border: 1px solid #333842;
+    touch-action: none;
+  }
+
+  .touch-controls { width: 100%; display: flex; flex-direction: column; gap: 5px; flex: 0 0 auto; }
+  .control-row { display: flex; gap: 5px; }
+  .touch-btn {
+    flex: 1;
+    background: #262a32; border: 1px solid #3a404b; color: #cfd4dc;
+    border-radius: 4px; font-size: 14px; font-family: inherit;
+    padding: 11px 0; cursor: pointer;
+  }
+  .touch-btn:active { background: #313742; }
+  .touch-btn.small { font-size: 12px; }
+  .touch-btn.active { background: #3a4f6b; border-color: #5a7aa0; color: #d8e6ff; }
+
+  .hint {
+    text-align: center;
+    color: #6c7484;
+    font-size: 11px;
+    letter-spacing: 1px;
+    margin-top: 2px;
+  }
+
+  .overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.7);
+    display: flex; justify-content: center; align-items: center;
+    z-index: 10;
+  }
+  .overlay.hidden { display: none; }
+  .panel {
+    background: #1d2026; border: 1px solid #3a404b; border-radius: 8px;
+    padding: 20px 24px; min-width: 250px; max-width: 90%;
+    color: #cfd4dc; font-size: 14px;
+  }
+  .panel h3 { margin: 0 0 16px; font-size: 16px; color: #e0e0e0; text-align: center; font-weight: normal; letter-spacing: 2px; }
+  .level-btn {
+    display: block; width: 100%; margin-bottom: 8px;
+    background: #262a32; border: 1px solid #3a404b; color: #cfd4dc;
+    border-radius: 4px; padding: 11px 0; font-family: inherit; font-size: 14px; cursor: pointer;
+  }
+  .level-btn.active { background: #3a4f6b; border-color: #5a7aa0; color: #d8e6ff; }
+  .level-btn:active { background: #313742; }
+  .panel .close { margin-top: 12px; }
+</style>
+</head>
+<body>
+<div class="game-container">
+  <div class="top-row">
+    <div class="info-box">
+      <span class="label">时间</span>
+      <span class="value" id="timeDisplay">0.0</span>
+    </div>
+    <div class="info-box">
+      <span class="label">最高</span>
+      <span class="value" id="bestDisplay">0.0</span>
+    </div>
+    <div class="info-box">
+      <span class="label">难度</span>
+      <span class="value" id="diffDisplay" style="font-size:14px;">普通</span>
+    </div>
+  </div>
+
+  <div class="board-wrap">
+    <canvas id="board"></canvas>
+  </div>
+
+  <div class="touch-controls">
+    <div class="control-row">
+      <button class="touch-btn small" id="diffBtn">选难度</button>
+      <button class="touch-btn small" id="resetBtn">重新开始</button>
+    </div>
+    <div class="hint">拖动下方小球躲开落下的障碍</div>
+  </div>
+</div>
+
+<div class="overlay hidden" id="diffOverlay">
+  <div class="panel">
+    <h3>选择难度</h3>
+    <button class="level-btn" data-diff="easy">简单 · 慢速</button>
+    <button class="level-btn" data-diff="normal">普通 · 标准</button>
+    <button class="level-btn" data-diff="hard">困难 · 又快又多</button>
+    <button class="level-btn close" id="diffClose">取消</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  const boardCanvas = document.getElementById('board');
+  const ctx = boardCanvas.getContext('2d');
+  const wrap = boardCanvas.parentElement;
+  const timeDisplay = document.getElementById('timeDisplay');
+  const bestDisplay = document.getElementById('bestDisplay');
+  const diffDisplay = document.getElementById('diffDisplay');
+  const diffBtn = document.getElementById('diffBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const diffOverlay = document.getElementById('diffOverlay');
+  const diffClose = document.getElementById('diffClose');
+
+  // 逻辑尺寸
+  const W = 320, H = 520;
+
+  const DIFF = {
+    easy:   { name: '简单', spawnBase: 1000, spawnMin: 320, speedBase: 0.12, speedMax: 0.42, ramp: 22000 },
+    normal: { name: '普通', spawnBase: 750,  spawnMin: 220, speedBase: 0.16, speedMax: 0.55, ramp: 16000 },
+    hard:   { name: '困难', spawnBase: 550,  spawnMin: 150, speedBase: 0.22, speedMax: 0.72, ramp: 12000 }
+  };
+  let diffKey = 'normal';
+  let diffCfg = DIFF.normal;
+
+  let player;
+  let obstacles;
+  let particles;
+  let elapsed = 0;         // 秒
+  let spawnTimer = 0;
+  let running = false;
+  let gameOver = false;
+  let rafId = null;
+  let lastTime = 0;
+  let touchX = null;       // 手指目标 x
+  let best = 0;
+
+  const PLAYER_R = 12;
+  const PLAYER_Y = H - 40;
+
+  try { best = parseFloat(localStorage.getItem('dodge_best') || '0'); } catch(e) { best = 0; }
+  if (isNaN(best)) best = 0;
+
+  function initGame() {
+    cancelAnimationFrame(rafId);
+    rafId = null;
+
+    player = { x: W / 2, y: PLAYER_Y, r: PLAYER_R, targetX: W / 2 };
+    obstacles = [];
+    particles = [];
+    elapsed = 0;
+    spawnTimer = 0;
+    running = true;
+    gameOver = false;
+    touchX = null;
+
+    updateUI();
+    resizeCanvas();
+    draw();
+    lastTime = performance.now();
+    rafId = requestAnimationFrame(loop);
+
+    requestAnimationFrame(() => { resizeCanvas(); draw(); });
+  }
+
+  function resizeCanvas() {
+    const maxW = wrap.clientWidth;
+    const maxH = wrap.clientHeight;
+    const availW = maxW > 0 ? maxW : Math.min(window.innerWidth - 30, 440);
+    const availH = maxH > 0 ? maxH : Math.min(window.innerHeight - 240, 620);
+    const scale = Math.min(availW / W, availH / H);
+    const cw = Math.max(160, Math.floor(W * scale));
+    const ch = Math.max(260, Math.floor(H * scale));
+    if (boardCanvas.width !== W || boardCanvas.height !== H) {
+      boardCanvas.width = W;
+      boardCanvas.height = H;
+    }
+    boardCanvas.style.width = cw + 'px';
+    boardCanvas.style.height = ch + 'px';
+  }
+
+  function updateUI() {
+    timeDisplay.textContent = elapsed.toFixed(1);
+    bestDisplay.textContent = best.toFixed(1);
+    diffDisplay.textContent = diffCfg.name;
+  }
+
+  // ---------- 主循环 ----------
+  function loop(now) {
+    rafId = requestAnimationFrame(loop);
+    if (!lastTime) lastTime = now;
+    let dt = now - lastTime;
+    lastTime = now;
+    if (dt > 50) dt = 50;   // 防跳变
+
+    if (running && !gameOver) {
+      update(dt);
+    }
+    draw();
+  }
+
+  function update(dt) {
+    const dtSec = dt / 1000;
+    elapsed += dtSec;
+
+    // 难度随时间上升
+    const t = Math.min(1, elapsed * 1000 / diffCfg.ramp);
+    const spawnInterval = diffCfg.spawnBase + (diffCfg.spawnMin - diffCfg.spawnBase) * t;
+    const fallSpeed = diffCfg.speedBase + (diffCfg.speedMax - diffCfg.speedBase) * t;
+
+    // 玩家移动（平滑跟随手指）
+    if (touchX !== null) {
+      player.targetX = touchX;
+    }
+    player.x += (player.targetX - player.x) * Math.min(1, dtSec * 18);
+    player.x = Math.max(player.r, Math.min(W - player.r, player.x));
+
+    // 生成障碍
+    spawnTimer += dt;
+    if (spawnTimer >= spawnInterval) {
+      spawnTimer -= spawnInterval;
+      spawnObstacle(fallSpeed, t);
+    }
+
+    // 更新障碍
+    for (let i = obstacles.length - 1; i >= 0; i--) {
+      const o = obstacles[i];
+      o.y += o.vy * dt;
+      o.rot = (o.rot || 0) + o.vr * dtSec;
+
+      // 碰撞检测（圆形玩家 vs 圆形/方形障碍，用圆近似）
+      const dx = o.x - player.x;
+      const dy = o.y - player.y;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      if (dist < player.r + o.r) {
+        gameOver = true;
+        running = false;
+        spawnExplosion(player.x, player.y);
+        if (elapsed > best) {
+          best = elapsed;
+          try { localStorage.setItem('dodge_best', String(best)); } catch(e) {}
+        }
+        updateUI();
+        return;
+      }
+
+      // 出界
+      if (o.y - o.r > H + 20 || o.x + o.r < -20 || o.x - o.r > W + 20) {
+        obstacles.splice(i, 1);
+      }
+    }
+
+    // 粒子
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vy += 0.0006 * dt;
+      p.life -= dt;
+      if (p.life <= 0) particles.splice(i, 1);
+    }
+
+    updateUI();
+  }
+
+  function spawnObstacle(speed, t) {
+    const r = 8 + Math.random() * 14;   // 半径 8~22
+    const x = r + Math.random() * (W - r * 2);
+    const vy = speed * (0.8 + Math.random() * 0.5);
+    const vr = (Math.random() - 0.5) * 0.006;
+
+    // 障碍类型：圆 / 方块 / 三角
+    const types = ['circle', 'square', 'triangle'];
+    const type = types[Math.floor(Math.random() * types.length)];
+
+    obstacles.push({
+      x, y: -r - 10, r, vy, vr, rot: 0, type,
+      color: ['#ff6f61', '#f9a26c', '#b286fe', '#5d9df9', '#f6d365'][Math.floor(Math.random()*5)]
+    });
+
+    // 高难度时偶尔一次生成两个
+    if (t > 0.55 && Math.random() < 0.35) {
+      const r2 = 8 + Math.random() * 12;
+      const x2 = r2 + Math.random() * (W - r2 * 2);
+      obstacles.push({
+        x: x2, y: -r2 - 10, r: r2,
+        vy: speed * (0.8 + Math.random() * 0.5),
+        vr: (Math.random() - 0.5) * 0.006,
+        rot: 0, type: types[Math.floor(Math.random()*types.length)],
+        color: ['#ff6f61', '#f9a26c', '#b286fe', '#5d9df9', '#f6d365'][Math.floor(Math.random()*5)]
+      });
+    }
+  }
+
+  function spawnExplosion(x, y) {
+    for (let i = 0; i < 22; i++) {
+      const ang = Math.random() * Math.PI * 2;
+      const sp = 0.08 + Math.random() * 0.28;
+      particles.push({
+        x, y,
+        vx: Math.cos(ang) * sp,
+        vy: Math.sin(ang) * sp - 0.1,
+        life: 500 + Math.random() * 400,
+        maxLife: 900,
+        r: 2 + Math.random() * 3,
+        color: ['#ff6f61', '#f6d365', '#f9a26c'][Math.floor(Math.random()*3)]
+      });
+    }
+  }
+
+  // ---------- 绘制 ----------
+  function draw() {
+    const cw = boardCanvas.width, ch = boardCanvas.height;
+    if (cw === 0 || ch === 0) return;
+    const scale = cw / W;
+
+    ctx.fillStyle = '#0d0f12';
+    ctx.fillRect(0, 0, cw, ch);
+
+    // 背景网格（淡）
+    ctx.strokeStyle = '#161a22';
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= W; x += 40) {
+      ctx.beginPath(); ctx.moveTo(x*scale, 0); ctx.lineTo(x*scale, ch); ctx.stroke();
+    }
+    for (let y = 0; y <= H; y += 40) {
+      ctx.beginPath(); ctx.moveTo(0, y*scale); ctx.lineTo(cw, y*scale); ctx.stroke();
+    }
+
+    // 玩家
+    if (!gameOver) {
+      ctx.fillStyle = '#7ee0a0';
+      ctx.beginPath();
+      ctx.arc(player.x * scale, player.y * scale, player.r * scale, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#2d7a4a';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    // 障碍
+    for (const o of obstacles) {
+      ctx.save();
+      ctx.translate(o.x * scale, o.y * scale);
+      ctx.rotate(o.rot);
+      ctx.fillStyle = o.color;
+      const R = o.r * scale;
+      if (o.type === 'circle') {
+        ctx.beginPath();
+        ctx.arc(0, 0, R, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (o.type === 'square') {
+        ctx.fillRect(-R, -R, R*2, R*2);
+      } else {
+        ctx.beginPath();
+        ctx.moveTo(0, -R);
+        ctx.lineTo(R * 0.9, R * 0.7);
+        ctx.lineTo(-R * 0.9, R * 0.7);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // 粒子
+    for (const p of particles) {
+      ctx.globalAlpha = Math.max(0, p.life / p.maxLife);
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x * scale, p.y * scale, p.r * scale, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // 游戏结束
+    if (gameOver) {
+      ctx.fillStyle = 'rgba(0,0,0,.72)';
+      ctx.fillRect(0, 0, cw, ch);
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = 'bold ' + Math.floor(Math.min(cw, ch) * 0.075) + 'px Arial, sans-serif';
+      ctx.fillStyle = '#ff6f61';
+      ctx.fillText('撞到了！', cw/2, ch/2 - 30);
+      ctx.font = Math.floor(Math.min(cw, ch) * 0.05) + 'px Arial, sans-serif';
+      ctx.fillStyle = '#d8d8d8';
+      ctx.fillText('坚持 ' + elapsed.toFixed(1) + ' 秒', cw/2, ch/2 + 20);
+    }
+
+    // 开始提示
+    if (!gameOver && elapsed < 0.5) {
+      ctx.fillStyle = 'rgba(255,255,255,.7)';
+      ctx.font = '15px Arial, sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('拖动小球，躲开障碍', cw/2, ch * 0.45);
+    }
+  }
+
+  // ---------- 输入 ----------
+  function getCanvasX(clientX) {
+    const rect = boardCanvas.getBoundingClientRect();
+    return (clientX - rect.left) / rect.width * W;
+  }
+
+  function onMove(clientX) {
+    touchX = getCanvasX(clientX);
+    touchX = Math.max(player.r, Math.min(W - player.r, touchX));
+  }
+
+  boardCanvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    if (gameOver) { initGame(); return; }
+    onMove(e.changedTouches[0].clientX);
+  }, { passive: false });
+
+  boardCanvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    onMove(e.changedTouches[0].clientX);
+  }, { passive: false });
+
+  boardCanvas.addEventListener('touchend', (e) => { e.preventDefault(); }, { passive: false });
+
+  let mouseDown = false;
+  boardCanvas.addEventListener('mousedown', (e) => {
+    mouseDown = true;
+    if (gameOver) { initGame(); return; }
+    onMove(e.clientX);
+  });
+  boardCanvas.addEventListener('mousemove', (e) => { if (mouseDown) onMove(e.clientX); });
+  boardCanvas.addEventListener('mouseup', () => { mouseDown = false; });
+  boardCanvas.addEventListener('mouseleave', () => { mouseDown = false; });
+
+  window.addEventListener('keydown', (e) => {
+    if (gameOver && (e.key === ' ' || e.key === 'Enter')) { e.preventDefault(); initGame(); return; }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); touchX = Math.max(player.r, (touchX === null ? player.x : touchX) - 18); }
+    if (e.key === 'ArrowRight') { e.preventDefault(); touchX = Math.min(W - player.r, (touchX === null ? player.x : touchX) + 18); }
+  });
+
+  // ---------- 按钮 ----------
+  resetBtn.addEventListener('click', initGame);
+  resetBtn.addEventListener('touchstart', (e) => { e.preventDefault(); initGame(); }, { passive: false });
+
+  function openDiff() {
+    diffOverlay.querySelectorAll('.level-btn[data-diff]').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.diff === diffKey);
+    });
+    diffOverlay.classList.remove('hidden');
+  }
+  diffBtn.addEventListener('click', openDiff);
+  diffBtn.addEventListener('touchstart', (e) => { e.preventDefault(); openDiff(); }, { passive: false });
+
+  diffOverlay.querySelectorAll('.level-btn[data-diff]').forEach(btn => {
+    const handler = (e) => {
+      e.preventDefault();
+      diffKey = btn.dataset.diff;
+      diffCfg = DIFF[diffKey];
+      diffOverlay.classList.add('hidden');
+      initGame();
+    };
+    btn.addEventListener('click', handler);
+    btn.addEventListener('touchstart', handler, { passive: false });
+  });
+  diffClose.addEventListener('click', () => diffOverlay.classList.add('hidden'));
+  diffClose.addEventListener('touchstart', (e) => { e.preventDefault(); diffOverlay.classList.add('hidden'); }, { passive: false });
+
+  window.addEventListener('resize', () => { resizeCanvas(); draw(); });
+  window.addEventListener('orientationchange', () => { setTimeout(() => { resizeCanvas(); draw(); }, 200); });
+
+  // 启动
+  initGame();
+})();
+</script>
+</body>
+</html>

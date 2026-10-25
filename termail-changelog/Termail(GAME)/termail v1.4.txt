@@ -1,0 +1,48 @@
+Termail Games v1.2.0 → v1.4.0 更新说明
+版本号：1.2.0 → 1.4.0（versionCode 3 → 4，包名 com.termail.spical 不变）
+
+本次主线是修复 HTML 游戏启动相关的 bug。
+
+一、修改（HTML 游戏修复）
+config.h
+
+APP_VERSION："1.1.0" → "1.4.0"（v1.2.0 漏改的版本号本次补齐）
+
+main.cpp
+
+setApplicationVersion("1.2.0") → "1.4.0"
+
+CMakeLists.txt
+
+project(TermailGames VERSION 1.2.0) → 1.4.0
+
+AndroidManifest.xml
+
+versionCode 3 → 4，versionName 1.2.0 → 1.4.0
+
+help_commands.cpp
+
+保留 v1.2.0 的去重结构（g_games 直接定义在本文件，不再引用 htmlgames.h）
+
+游戏表仍为 30 条（含 [29] dou-di-zhu、[30] guard-the-blue）
+
+launchHtmlGame 保持 ComponentName 显式启动 + FLAG_ACTIVITY_NEW_TASK
+
+findGame 编号判断保持 if (isNum && num >= 1)
+
+htmlgames.cpp / htmlgames.h
+
+游戏表 30 条，launch 仍用 QJniObject("com/termail/spical/GameWebView", "(Landroid/content/Context;)V", ...) 构造 Intent
+
+其余方法不变
+
+terminal.cpp / terminal.h / commands.cpp / commands.h / fun_commands.cpp / utils.cpp / utils.h
+
+与 v1.2.0 一致，无改动
+
+二、其他
+help_commands.cpp 与 htmlgames.cpp 又各自维护了一份 30 条游戏表（v1.2.0 已经统一到 htmlgames.h，本次又拆回各自本地定义），两处需同步维护
+
+help_commands.cpp 的 launchHtmlGame（ComponentName 方式）与 htmlgames.cpp 的 HtmlGames::launch（构造 Intent 方式）两套启动代码并存，实际注册的命令走 launchHtmlGame
+
+config.h 的 APP_VERSION 本次终于与 main.cpp、CMakeLists、Manifest 对齐为 1.4.0

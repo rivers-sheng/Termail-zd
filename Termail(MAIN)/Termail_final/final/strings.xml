@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="shortcut_new_session_short">新建会话</string>
-    <string name="shortcut_new_session_long">创建新终端会话</string>
-    <string name="shortcut_proot_short">进入PRoot</string>
-    <string name="shortcut_proot_long">启动 PRoot 环境</string>
-</resources>

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>斗地主</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="game-container">
+  <div class="top-row">
+    <div class="info-box">身份: <span id="roleDisplay">未知</span></div>
+    <div class="info-box">我的牌: <span id="countDisplay">17</span></div>
+    <div class="info-box">农民牌: <span id="aiCountDisplay">17 / 17</span></div>
+  </div>
+
+  <div class="table-wrap">
+    <div class="bottom-cards" id="bottomCards"></div>
+    <div class="ai-play-area left" id="leftPlayArea"></div>
+    <div class="ai-play-area right" id="rightPlayArea"></div>
+    <div class="play-area">
+      <div class="play-cards" id="playCards"></div>
+      <div class="msg-box" id="msgBox"></div>
+    </div>
+    <div class="hand-area" id="handArea"></div>
+  </div>
+
+  <div class="touch-controls">
+    <button class="touch-btn" id="callBtn">叫地主</button>
+    <button class="touch-btn" id="noCallBtn">不叫</button>
+    <button class="touch-btn" id="passBtn" disabled>不出</button>
+    <button class="touch-btn primary" id="playBtn" disabled>出牌</button>
+    <button class="touch-btn" id="hintBtn" disabled>提示</button>
+    <button class="touch-btn" id="levelBtn">难度</button>
+    <button class="touch-btn" id="resetBtn">重开</button>
+  </div>
+</div>
+
+<!-- 难度选择弹窗（补全了） -->
+<div class="overlay hidden" id="levelOverlay">
+  <div class="panel">
+    <h3>选择 AI 难度</h3>
+    <button class="level-btn" data-level="easy">简单 · 随手乱打</button>
+    <button class="level-btn" data-level="normal">普通 · 会算牌能压制</button>
+    <button class="level-btn" data-level="hard">困难 · 懂配合算最优</button>
+    <button class="level-btn close" id="levelClose">取消</button>
+  </div>
+</div>
+
+<script src="ai.js"></script>
+<script src="game.js"></script>
+</body>
+</html>

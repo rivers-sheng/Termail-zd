@@ -1,0 +1,254 @@
+Termail v6.2 final → v6.4.0 更新说明
+版本号：6.2.0_final → 6.4.0（versionCode 12 → 13，标签 Termail_final → Termail）
+
+一、新增
+Lua 脚本引擎（最大改动）
+
+新增 lua/ 子目录，内置 Lua 5.4 源码（lapi.c … lzio.c 共 33 个 C 文件），CMake 以 project(lua C) + add_library(lua STATIC ...) 编译为静态库，主工程 target_link_libraries(... lua)
+
+lua/lua_engine.h / lua_engine.cpp：LuaEngine 类
+
+runString(code)：luaL_newstate + luaL_openlibs + luaL_dostring，注册自定义 print 到全局
+
+runFile(path)：UTF-8 读文件后调 runString
+
+通过文件级 static TerminalWidget* g_luaUi 让 print 输出到终端输出区（PROMPT_COLOR）
+
+commands/lua_commands.cpp：
+
+lua <文件.lua> 或 lua -e "代码"
+
+luainfo：Lua 版本与用法说明
+
+luademo：生成 demo.lua 示例脚本（变量、循环、斐波那契、表求和）
+
+图形化编辑器
+
+editor/editor_dialog.h / editor_dialog.cpp：EditorDialog : QDialog
+
+无边框全屏，顶部工具栏（文件名、查找框、查找/替换/行号/保存/关闭按钮）
+
+QTextEdit 编辑区（NoWrap、tab 40px、UTF-8）
+
+状态栏 200ms 刷新行/列/字符数/修改状态
+
+Ctrl+S 保存、Ctrl+F 查找、Ctrl+H 替换、Esc 关闭
+
+closeEvent 调 maybeSave() 弹「保存/丢弃/取消」
+
+行号按钮仅切换状态文本（QTextEdit 原生不支持行号，属简化实现）
+
+editor/editor_commands.cpp：
+
+edit <文件>：打开编辑器
+
+nano <文件>：转发 edit（覆盖 system 里的 nano 占位）
+
+create <文件>：先创建空文件再 edit
+
+ssh_commands.cpp 新增（相对 v6.2 final 已存在的主机管理）
+
+ssh-host add/list/rm/edit/show：主机配置存 .ssh/hosts.json
+
+ssh-connect <名>：按配置快速连接，自动带 -i id_rsa
+
+ssh-config-gen：生成 .ssh/config
+
+ssh-keygen-pass：ssh-keygen -p 加密码
+
+ssh-tunnel <映射> <主机>：ssh -N -L 端口转发
+
+network2_commands.cpp 重写为完整 Web 文件管理器
+
+serve [端口]：内嵌 HTML 文件管理页
+
+GET /：首页，列出文件、目录、大小，带图标
+
+GET /xxx/：子目录浏览，带「返回上级」「根目录」
+
+GET /download?path=xxx：文件下载（application/octet-stream）
+
+POST /delete：删除文件/目录（fetch 调用）
+
+POST /mkdir：新建文件夹（302 重定向）
+
+POST /upload：multipart 上传解析（boundary + filename= + Content-Length）
+
+请求按 Content-Length 聚合完整后再处理（client->property("data") 累积）
+
+每次操作在终端输出 [HTTP] 上传/删除/新建 日志
+
+移除 v6.2 的 netscan、mget
+
+proot_commands.cpp 重写
+
+移除多发行版（Ubuntu）支持，仅保留 Alpine
+
+proot-setup：新增逐步校验（busybox 存在、proot 资源非空、写权限、权限设置、waitForStarted、waitForFinished(120000) 超时、解压结果验证 bin/busybox），任一步失败回滚删除
+
+proot-shell：多实例检查（currentProcess 非 NotRunning 则拒绝）
+
+proot-mirror：DNS 固定 119.29.29.29
+
+proot-update：新增，apk update
+
+proot-status：精简为 proot / Alpine 两项
+
+distro：降级为仅显示 Alpine 状态
+
+set-dns [IP] [备用IP]：新增，读取/写入 /etc/resolv.conf，IP 正则校验，无参数时显示当前 DNS 与推荐列表
+
+pre-position：清单更新（去掉 distro ubuntu，加入 set-dns）
+
+system_commands.cpp 新增
+
+clip [get|set <文本>|clear]：剪贴板操作
+
+brightness <0-100>：Android JNI 设置 screenBrightness
+
+page <文件>：分页查看（30 行/页）
+
+enhanced_commands.cpp（v6.2 final 已存在，本次内容未变）
+
+about_commands.cpp / config_commands.cpp / many4.cpp
+
+v6.2 final 已存在，本次内容未变
+
+CMakeLists.txt
+
+project(Termail VERSION 6.4.0)
+
+add_subdirectory(lua)
+
+SOURCES 新增：editor/editor_dialog.cpp、editor/editor_commands.cpp、lua/lua_engine.cpp、commands/lua_commands.cpp
+
+HEADERS 新增：editor/editor_dialog.h、lua/lua_engine.h
+
+移除 games/tetris.cpp、games/snake.cpp、games/game2048.cpp、games/*.h
+
+移除 commands/game_commands.cpp
+
+移除 commands/notify_commands.cpp（但 commands.cpp 仍调用 registerNotifyCommands，见下方「其他」）
+
+资源移除 resources/proot/ubuntu.tar
+
+target_include_directories 新增 editor、lua
+
+QT_ANDROID_APP_NAME："Termail_final" → "Termail"
+
+AndroidManifest.xml
+
+versionCode 12 → 13，versionName 6.2.0_final → 6.4.0
+
+标签 Termail_final → Termail
+
+其余（service、SEND intent-filter、权限、icon）与 v6.2 final 一致
+
+config.h
+
+APP_NAME："Termail_final" → "Termail"
+
+APP_VERSION："6.2.0" → "6.4.0"
+
+main.cpp
+
+setApplicationName("Termail")、setApplicationVersion("6.4.0")，与 config.h 对齐
+
+二、修改
+commands.h / commands.cpp
+
+新增 2 个注册函数：registerEditorCommands、registerLuaCommands
+
+移除 registerGameCommands 调用
+
+registerNotifyCommands 调用仍在，但 notify_commands.cpp 已从 CMake SOURCES 移除
+
+terminal.cpp 的 executeRedirect 重写
+
+v6.2 final：commandLine.contains(">>") + split
+
+v6.4：正则 (>>|>)\s*([^>|]+)$ 精确匹配末尾重定向符，cmd 取 left(match.capturedStart(1))，filename 去引号，格式错误时提示「重定向格式错误」
+
+terminal.cpp 的引号扫描
+
+从「双引号/单引号都翻转 inQuote」改为「记录 quoteChar，只有匹配同一引号才退出引号」，正确支持 'a"b' 这类嵌套
+
+utils.cpp 新增耗时统计
+
+QElapsedTimer 记录进程耗时，finished 时若 > 1000ms 输出 [耗时] program: N ms
+
+errorOccurred 中 delete elapsed（与 finished 的 delete 存在双重释放风险，见「其他」）
+
+移除 v6.2 final 的 g_processCount 并发限制与 [执行中] 提示
+
+utils.h
+
+与 v6.2 final 一致（timeout = 0 默认）
+
+network2_commands.cpp
+
+从 v6.2 final 的「简单文件浏览 + 404」重写为「完整 Web 文件管理器」
+
+移除 netscan、mget
+
+Network2Cleanup::cleanup() 保留
+
+proot_commands.cpp
+
+从 v6.2 Pro 的多发行版实现回退为 Alpine-only，并大幅加强错误处理与回滚
+
+ssh_commands.cpp
+
+与 v6.2 final 一致（新增内容在 v6.2 final 已含）
+
+system_commands.cpp
+
+新增 clip、brightness、page
+
+nano 不再转发外部命令（v6.2 final 是 CommandHelper::runExternal("nano", ...)），当前版本被 editor_commands.cpp 的 nano 覆盖（editor_commands 在 registerAllBuiltins 中后注册，但因 registerCommand 有防重复，先注册的 system_commands 的 nano 生效，实际仍走外部 nano）
+
+fun_commands.cpp / file_commands.cpp / text_commands.cpp / many1/2/3.cpp / cmenu.cpp / log_commands.cpp / about_commands.cpp / config_commands.cpp / many4.cpp / enhanced_commands.cpp / session_commands.cpp
+
+与 v6.2 final 内容一致，无改动
+
+游戏模块整体下线
+
+games/tetris.*、games/snake.*、games/game2048.*、commands/game_commands.cpp 从 CMake 移除
+
+many4.cpp 的 game-score 命令仍在，读取 QSettings("termail","games") 的 snake_high / tetris_high / g2048_high，但游戏本身已不存在，这些值不会再更新
+
+三、其他
+commands.cpp 仍调用 registerNotifyCommands(ui)，但 commands/notify_commands.cpp 已从 CMake SOURCES 移除，若头文件声明还在则链接失败，若声明也删了则编译失败——这是当前版本最可能直接导致构建失败的改动
+
+commands.h 仍声明 registerNotifyCommands（未随 CMake 移除），但 notify_commands.cpp 不在 SOURCES 里
+
+utils.cpp 的 elapsed 指针在 finished 与 errorOccurred 两个回调里都 delete，若两信号都触发会双重释放崩溃
+
+lua_engine.cpp 的 lua_print 用 luaL_tolstring，该函数会把栈顶值转字符串并压入新值，循环里 lua_pop(L, 1) 是对的，但 luaL_tolstring 对 table 会调用 __tostring 或返回 "table: 0x..."，属 Lua 标准行为
+
+lua_engine.cpp 的 g_luaUi 是文件级 static，非线程安全；runString 结束后置 nullptr，若 print 在 lua_close 后仍被调用（不太可能）会悬空
+
+editor_dialog.cpp 的 lineNumbersVisible 切换只改状态栏文本，没有真正显示行号，属未完成功能
+
+editor_dialog.cpp 的 maybeSave() 在 saveFile() 失败（QMessageBox::warning 后）仍返回 true，会导致关闭时丢数据
+
+editor_commands.cpp 的 nano 被 system_commands.cpp 先注册的 nano 占位（registerCommand 防重复），实际不会打开图形编辑器
+
+network2_commands.cpp 的 handleRequest 在 POST /upload 里用 request.mid(headerEnd + 4).toUtf8()，request 本身是 QString::fromUtf8(data)，二进制文件经 UTF-8 往返会损坏，上传二进制文件（如图片/压缩包）会失败
+
+network2_commands.cpp 的 serve 未做路径穿越防护，path.mid(1) 后直接 QDir(baseDir).absoluteFilePath(...)，GET /../../etc/passwd 类请求可读到 baseDir 外的文件
+
+proot_commands.cpp 的 set-dns 用 printf '%4\n'，其中 %4 是 confContent（含 \n 字面量），实际写入的是 nameserver x.x.x.x\nnameserver y.y.y.y（\n 未转义为换行），DNS 配置格式不正确
+
+proot-commands.cpp 的 proot-setup 在 waitForStarted 失败时 QFile::remove(tarPath) + QFile::remove(prootPath)，但未删除已 mkpath 的 rootfsPath 目录
+
+terminal.cpp 的 vibrate 仍用 callMethod<jboolean>("vibrate", "(J)Z", ...)，签名错误（应为 (J)V），Android 上会抛 JNI 异常
+
+system_commands.cpp 的 brightness 仍用 setField<jdouble>("screenBrightness", ...)，字段类型应为 float
+
+main.cpp 的 std::set_terminate(crashHandler) 中 crashHandler 只写日志不恢复，属简化处理
+
+CMakeLists.txt 的 QT_ANDROID_APP_NAME 已与 config.h / main.cpp 对齐为 "Termail"（v6.2 系列首次完全统一）
+
+lua/CMakeLists.txt 用 project(lua C) 而非 add_library 直挂主工程，子目录 project() 会重置部分变量，Android 交叉编译时需确认 toolchain 传递正常
+

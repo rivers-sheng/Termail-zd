@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>像素鸟</title>
+<style>
+  * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #15171c;
+    font-family: Arial, "Microsoft YaHei", sans-serif;
+    overflow: hidden;
+  }
+  body { display: flex; justify-content: center; align-items: center; padding: 6px; }
+
+  .game-container {
+    background: #1d2026;
+    border: 1px solid #333842;
+    padding: 8px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    width: 100%; height: 100%;
+    max-width: 460px;
+  }
+
+  .top-row { display: flex; gap: 6px; width: 100%; flex: 0 0 auto; }
+  .info-box {
+    flex: 1;
+    background: #14161a; border: 1px solid #333842;
+    padding: 4px 10px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .info-box .label { color: #6c7484; font-size: 12px; }
+  .info-box .value { color: #d8d8d8; font-size: 18px; font-weight: bold; }
+  .info-box .value.best { color: #f6d365; }
+
+  .board-wrap {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+  }
+  canvas#board {
+    display: block;
+    background: #0d0f12;
+    border: 1px solid #333842;
+    touch-action: none;
+  }
+
+  .touch-controls { width: 100%; display: flex; gap: 5px; flex: 0 0 auto; }
+  .touch-btn {
+    flex: 1;
+    background: #262a32; border: 1px solid #3a404b; color: #cfd4dc;
+    border-radius: 4px; font-size: 14px; font-family: inherit;
+    padding: 11px 0; cursor: pointer;
+  }
+  .touch-btn:active { background: #313742; }
+  .touch-btn.small { font-size: 12px; }
+
+  .hint {
+    text-align: center;
+    color: #6c7484;
+    font-size: 11px;
+    letter-spacing: 1px;
+    margin-top: 2px;
+  }
+
+  .overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.75);
+    display: flex; justify-content: center; align-items: center;
+    z-index: 10;
+  }
+  .overlay.hidden { display: none; }
+  .panel {
+    background: #1d2026; border: 1px solid #3a404b; border-radius: 8px;
+    padding: 22px 26px; min-width: 260px; max-width: 90%;
+    color: #cfd4dc; font-size: 14px; text-align: center;
+  }
+  .panel h3 { margin: 0 0 16px; font-size: 17px; color: #e0e0e0; font-weight: normal; letter-spacing: 2px; }
+  .panel .big { font-size: 32px; font-weight: bold; color: #7ee0a0; margin: 8px 0 4px; }
+  .panel .sub { color: #8a94a6; font-size: 13px; margin-bottom: 18px; }
+  .panel button {
+    width: 100%; padding: 11px 0; margin-top: 8px;
+    background: #262a32; border: 1px solid #3a404b;
+    color: #cfd4dc; border-radius: 4px; font-family: inherit; font-size: 14px; cursor: pointer;
+  }
+  .panel button.primary { background: #2b3a4a; border-color: #3a4f6b; color: #b8cbe8; }
+  .panel button:active { background: #313742; }
+</style>
+</head>
+<body>
+<div class="game-container">
+  <div class="top-row">
+    <div class="info-box">
+      <span class="label">分数</span>
+      <span class="value" id="scoreDisplay">0</span>
+    </div>
+    <div class="info-box">
+      <span class="label">最高</span>
+      <span class="value best" id="bestDisplay">0</span>
+    </div>
+  </div>
+
+  <div class="board-wrap">
+    <canvas id="board"></canvas>
+  </div>
+
+  <div class="touch-controls">
+    <button class="touch-btn small" id="resetBtn">重新开始</button>
+  </div>
+  <div class="hint">点击屏幕让小鸟往上飞</div>
+</div>
+
+<div class="overlay hidden" id="overOverlay">
+  <div class="panel">
+    <h3>撞到了</h3>
+    <div class="big" id="finalScore">0</div>
+    <div class="sub" id="finalBest">最高 0</div>
+    <button class="primary" id="overRestart">再来一次</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  const boardCanvas = document.getElementById('board');
+  const ctx = boardCanvas.getContext('2d');
+  const wrap = boardCanvas.parentElement;
+  const scoreDisplay = document.getElementById('scoreDisplay');
+  const bestDisplay = document.getElementById('bestDisplay');
+  const resetBtn = document.getElementById('resetBtn');
+  const overOverlay = document.getElementById('overOverlay');
+  const finalScore = document.getElementById('finalScore');
+  const finalBest = document.getElementById('finalBest');
+  const overRestart = document.getElementById('overRestart');
+
+  // 逻辑尺寸
+  const W = 320, H = 520;
+
+  // 物理参数（可调，手感全靠这几个）
+  const GRAVITY = 0.45;      // 重力加速度
+  const FLAP = -7.2;         // 点击给的向上速度
+  const MAX_FALL = 11;       // 最大下落速度
+
+  // 小鸟
+  const BIRD_X = 90;
+  const BIRD_R = 13;
+
+  // 管道
+  const PIPE_W = 56;
+  const GAP = 150;           // 上下管道之间的空隙
+  const PIPE_SPEED = 2.6;    // 管道左移速度
+  const PIPE_INTERVAL = 95;  // 每多少帧生成一根（越小越密）
+
+  let bird, pipes, score, best, state, frame;
+  // state: 'ready' 未开始 / 'play' / 'over'
+
+  try { best = parseInt(localStorage.getItem('flappy_best') || '0', 10); } catch(e) { best = 0; }
+  if (isNaN(best)) best = 0;
+
+  let rafId = null;
+
+  function initGame() {
+    cancelAnimationFrame(rafId);
+    rafId = null;
+
+    bird = { y: H / 2, vy: 0, rot: 0 };
+    pipes = [];
+    score = 0;
+    frame = 0;
+    state = 'ready';
+
+    overOverlay.classList.add('hidden');
+    updateUI();
+    resizeCanvas();
+    draw();
+    lastTime = 0;
+    rafId = requestAnimationFrame(loop);
+    requestAnimationFrame(() => { resizeCanvas(); draw(); });
+  }
+
+  function resizeCanvas() {
+    const maxW = wrap.clientWidth;
+    const maxH = wrap.clientHeight;
+    const availW = maxW > 0 ? maxW : Math.min(window.innerWidth - 30, 440);
+    const availH = maxH > 0 ? maxH : Math.min(window.innerHeight - 200, 620);
+    const scale = Math.min(availW / W, availH / H);
+    const cw = Math.max(160, Math.floor(W * scale));
+    const ch = Math.max(260, Math.floor(H * scale));
+    if (boardCanvas.width !== W || boardCanvas.height !== H) {
+      boardCanvas.width = W;
+      boardCanvas.height = H;
+    }
+    boardCanvas.style.width = cw + 'px';
+    boardCanvas.style.height = ch + 'px';
+  }
+
+  function updateUI() {
+    scoreDisplay.textContent = score;
+    bestDisplay.textContent = best;
+  }
+
+  // ---------- 主循环 ----------
+  let lastTime = 0;
+  function loop(now) {
+    rafId = requestAnimationFrame(loop);
+    if (!lastTime) lastTime = now;
+    let dt = now - lastTime;
+    lastTime = now;
+    if (dt > 50) dt = 50;
+
+    if (state === 'play') {
+      update(dt);
+    } else if (state === 'ready') {
+      // 待机时小鸟轻轻上下浮动
+      bird.y = H / 2 + Math.sin(now / 300) * 8;
+      bird.rot = 0;
+    }
+    draw();
+  }
+
+  function update(dt) {
+    // 用固定步长推进，速度跟帧率无关
+    const steps = Math.max(1, Math.round(dt / 16.67));
+    for (let s = 0; s < steps; s++) {
+      tick();
+      if (state !== 'play') return;
+    }
+  }
+
+  function tick() {
+    frame++;
+
+    // 小鸟物理
+    bird.vy += GRAVITY;
+    if (bird.vy > MAX_FALL) bird.vy = MAX_FALL;
+    bird.y += bird.vy;
+
+    // 鸟头朝向：上升朝上，下落朝下
+    const targetRot = Math.max(-0.5, Math.min(1.2, bird.vy / 12));
+    bird.rot += (targetRot - bird.rot) * 0.2;
+
+    // 生成管道
+    if (frame % PIPE_INTERVAL === 0) {
+      const minTop = 60;
+      const maxTop = H - GAP - 60;
+      const topH = minTop + Math.random() * (maxTop - minTop);
+      pipes.push({ x: W + 10, topH, passed: false });
+    }
+
+    // 移动管道
+    for (let i = pipes.length - 1; i >= 0; i--) {
+      const p = pipes[i];
+      p.x -= PIPE_SPEED;
+
+      // 计分（鸟飞过管道）
+      if (!p.passed && p.x + PIPE_W < BIRD_X) {
+        p.passed = true;
+        score++;
+        updateUI();
+      }
+
+      // 移出屏幕
+      if (p.x + PIPE_W < -20) {
+        pipes.splice(i, 1);
+      }
+    }
+
+    // 碰撞检测
+    // 上边界
+    if (bird.y - BIRD_R < 0) { bird.y = BIRD_R; endGame(); return; }
+    // 下边界
+    if (bird.y + BIRD_R > H) { bird.y = H - BIRD_R; endGame(); return; }
+
+    // 管道
+    for (const p of pipes) {
+      // 水平重叠？
+      if (BIRD_X + BIRD_R > p.x && BIRD_X - BIRD_R < p.x + PIPE_W) {
+        // 上方管道：0 ~ topH
+        // 下方管道：topH + GAP ~ H
+        if (bird.y - BIRD_R < p.topH || bird.y + BIRD_R > p.topH + GAP) {
+          endGame();
+          return;
+        }
+      }
+    }
+  }
+
+  function endGame() {
+    state = 'over';
+    if (score > best) {
+      best = score;
+      try { localStorage.setItem('flappy_best', String(best)); } catch(e) {}
+    }
+    updateUI();
+    finalScore.textContent = score;
+    finalBest.textContent = '最高 ' + best;
+    overOverlay.classList.remove('hidden');
+  }
+
+  function flap() {
+    if (state === 'ready') {
+      state = 'play';
+      bird.vy = FLAP;
+    } else if (state === 'play') {
+      bird.vy = FLAP;
+    }
+  }
+
+  // ---------- 绘制 ----------
+  function draw() {
+    const cw = boardCanvas.width, ch = boardCanvas.height;
+    if (cw === 0 || ch === 0) return;
+    const scale = cw / W;
+
+    // 背景
+    ctx.fillStyle = '#0d0f12';
+    ctx.fillRect(0, 0, cw, ch);
+
+    // 背景网格（淡）
+    ctx.strokeStyle = '#161a22';
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= W; x += 40) {
+      ctx.beginPath(); ctx.moveTo(x*scale, 0); ctx.lineTo(x*scale, ch); ctx.stroke();
+    }
+    for (let y = 0; y <= H; y += 40) {
+      ctx.beginPath(); ctx.moveTo(0, y*scale); ctx.lineTo(cw, y*scale); ctx.stroke();
+    }
+
+    // 管道
+    for (const p of pipes) {
+      ctx.fillStyle = '#5cdb95';
+      // 上管道
+      ctx.fillRect(p.x * scale, 0, PIPE_W * scale, p.topH * scale);
+      // 下管道
+      const bottomY = p.topH + GAP;
+      ctx.fillRect(p.x * scale, bottomY * scale, PIPE_W * scale, (H - bottomY) * scale);
+
+      // 管口描边（加点立体感）
+      ctx.strokeStyle = '#2d7a4a';
+      ctx.lineWidth = 3;
+      // 上管口
+      ctx.strokeRect(p.x * scale + 1, (p.topH - 10) * scale, PIPE_W * scale - 2, 10 * scale);
+      ctx.fillStyle = '#7ee0a0';
+      ctx.fillRect(p.x * scale, (p.topH - 10) * scale, PIPE_W * scale, 10 * scale);
+      // 下管口
+      ctx.fillStyle = '#5cdb95';
+      ctx.strokeRect(p.x * scale + 1, bottomY * scale, PIPE_W * scale - 2, 10 * scale);
+      ctx.fillStyle = '#7ee0a0';
+      ctx.fillRect(p.x * scale, bottomY * scale, PIPE_W * scale, 10 * scale);
+    }
+
+    // 小鸟
+    ctx.save();
+    ctx.translate(BIRD_X * scale, bird.y * scale);
+    ctx.rotate(bird.rot);
+
+    // 身体
+    ctx.fillStyle = '#f6d365';
+    ctx.beginPath();
+    ctx.arc(0, 0, BIRD_R * scale, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#b88a00';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // 眼睛
+    ctx.fillStyle = '#1d2026';
+    ctx.beginPath();
+    ctx.arc(4 * scale, -3 * scale, 2.5 * scale, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 嘴巴
+    ctx.fillStyle = '#f9a26c';
+    ctx.beginPath();
+    ctx.moveTo(BIRD_R * scale - 2, 0);
+    ctx.lineTo(BIRD_R * scale + 8, 2 * scale);
+    ctx.lineTo(BIRD_R * scale - 2, 5 * scale);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+
+    // 待机提示
+    if (state === 'ready') {
+      ctx.fillStyle = 'rgba(255,255,255,.75)';
+      ctx.font = '15px Arial, sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('点击屏幕开始', cw / 2, ch * 0.38);
+    }
+  }
+
+  // ---------- 输入 ----------
+  function onPress(e) {
+    e.preventDefault();
+    if (state === 'over') return;
+    flap();
+  }
+
+  boardCanvas.addEventListener('touchstart', onPress, { passive: false });
+  boardCanvas.addEventListener('mousedown', onPress);
+
+  resetBtn.addEventListener('click', initGame);
+  resetBtn.addEventListener('touchstart', (e) => { e.preventDefault(); initGame(); }, { passive: false });
+
+  overRestart.addEventListener('click', initGame);
+  overRestart.addEventListener('touchstart', (e) => { e.preventDefault(); initGame(); }, { passive: false });
+
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' || e.key === ' ') {
+      e.preventDefault();
+      if (state === 'over') initGame();
+      else flap();
+    }
+  });
+
+  window.addEventListener('resize', () => { resizeCanvas(); draw(); });
+  window.addEventListener('orientationchange', () => { setTimeout(() => { resizeCanvas(); draw(); }, 200); });
+
+  initGame();
+})();
+</script>
+</body>
+</html>

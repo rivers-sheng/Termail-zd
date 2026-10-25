@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>数字华容道</title>
+<style>
+  * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #15171c;
+    font-family: Arial, "Microsoft YaHei", sans-serif;
+    overflow: hidden;
+  }
+  body { display: flex; justify-content: center; align-items: center; padding: 6px; }
+
+  .game-container {
+    background: #1d2026;
+    border: 1px solid #333842;
+    padding: 8px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    width: 100%; height: 100%;
+    max-width: 460px;
+  }
+
+  .top-row { display: flex; gap: 6px; width: 100%; flex: 0 0 auto; }
+  .info-box {
+    flex: 1;
+    background: #14161a; border: 1px solid #333842;
+    padding: 4px 10px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .info-box .label { color: #6c7484; font-size: 12px; }
+  .info-box .value { color: #d8d8d8; font-size: 20px; font-weight: bold; }
+
+  .board-wrap {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+  }
+  canvas#board {
+    display: block;
+    background: #0d0f12;
+    border: 1px solid #333842;
+    touch-action: none;
+  }
+
+  .touch-controls { width: 100%; display: flex; flex-direction: column; gap: 5px; flex: 0 0 auto; }
+  .control-row { display: flex; gap: 5px; }
+  .touch-btn {
+    flex: 1;
+    background: #262a32; border: 1px solid #3a404b; color: #cfd4dc;
+    border-radius: 4px; font-size: 15px; font-family: inherit;
+    padding: 11px 0; cursor: pointer;
+  }
+  .touch-btn:active { background: #313742; }
+  .touch-btn.small { font-size: 13px; }
+  .touch-btn.active { background: #3a4f6b; border-color: #5a7aa0; color: #d8e6ff; }
+
+  .hint {
+    text-align: center;
+    color: #6c7484;
+    font-size: 11px;
+    letter-spacing: 1px;
+    margin-top: 2px;
+  }
+
+  .overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.7);
+    display: flex; justify-content: center; align-items: center;
+    z-index: 10;
+  }
+  .overlay.hidden { display: none; }
+  .panel {
+    background: #1d2026; border: 1px solid #3a404b; border-radius: 8px;
+    padding: 20px 24px; min-width: 250px; max-width: 90%;
+    color: #cfd4dc; font-size: 14px;
+  }
+  .panel h3 { margin: 0 0 16px; font-size: 16px; color: #e0e0e0; text-align: center; font-weight: normal; letter-spacing: 2px; }
+  .level-btn {
+    display: block; width: 100%; margin-bottom: 8px;
+    background: #262a32; border: 1px solid #3a404b; color: #cfd4dc;
+    border-radius: 4px; padding: 11px 0; font-family: inherit; font-size: 14px; cursor: pointer;
+  }
+  .level-btn.active { background: #3a4f6b; border-color: #5a7aa0; color: #d8e6ff; }
+  .level-btn:active { background: #313742; }
+  .panel .close { margin-top: 12px; }
+</style>
+</head>
+<body>
+<div class="game-container">
+  <div class="top-row">
+    <div class="info-box">
+      <span class="label">步数</span>
+      <span class="value" id="moveDisplay">0</span>
+    </div>
+    <div class="info-box">
+      <span class="label">用时</span>
+      <span class="value" id="timeDisplay">0</span>
+    </div>
+    <div class="info-box">
+      <span class="label">尺寸</span>
+      <span class="value" id="sizeDisplay" style="font-size:14px;">3×3</span>
+    </div>
+  </div>
+
+  <div class="board-wrap">
+    <canvas id="board"></canvas>
+  </div>
+
+  <div class="touch-controls">
+    <div class="control-row">
+      <button class="touch-btn small" id="sizeBtn">选尺寸</button>
+      <button class="touch-btn small" id="resetBtn">打乱重来</button>
+    </div>
+    <div class="hint">点空格旁边的块滑动</div>
+  </div>
+</div>
+
+<div class="overlay hidden" id="sizeOverlay">
+  <div class="panel">
+    <h3>选择尺寸</h3>
+    <button class="level-btn" data-size="3">3 × 3 · 简单</button>
+    <button class="level-btn" data-size="4">4 × 4 · 经典</button>
+    <button class="level-btn" data-size="5">5 × 5 · 挑战</button>
+    <button class="level-btn close" id="sizeClose">取消</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  const boardCanvas = document.getElementById('board');
+  const ctx = boardCanvas.getContext('2d');
+  const wrap = boardCanvas.parentElement;
+  const moveDisplay = document.getElementById('moveDisplay');
+  const timeDisplay = document.getElementById('timeDisplay');
+  const sizeDisplay = document.getElementById('sizeDisplay');
+  const sizeBtn = document.getElementById('sizeBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const sizeOverlay = document.getElementById('sizeOverlay');
+  const sizeClose = document.getElementById('sizeClose');
+
+  let N = 3;              // 阶数
+  let cellSize = 30;
+  let tiles;              // 一维数组，长度 N*N，0 表示空格
+  let moves = 0;
+  let seconds = 0;
+  let timer = null;
+  let solved = false;
+
+  const BEST_KEY = 'puzzle_best';
+
+  // ---------- 初始化 ----------
+  function initGame() {
+    if (timer) { clearInterval(timer); timer = null; }
+    moves = 0;
+    seconds = 0;
+    solved = false;
+    tiles = shuffledTiles(N);
+    updateUI();
+    computeCellSize();
+    draw();
+    requestAnimationFrame(() => { computeCellSize(); draw(); });
+  }
+
+  // 生成一个可解的打乱局面
+  function shuffledTiles(n) {
+    const total = n * n;
+    let arr = [];
+    for (let i = 1; i < total; i++) arr.push(i);
+    arr.push(0);   // 空格
+
+    // 从已解状态开始，做大量随机合法移动，保证可解
+    let empty = total - 1;
+    let lastMove = -1;
+    const steps = n * n * 60;
+    for (let s = 0; s < steps; s++) {
+      const nb = neighborsIdx(empty, n);
+      // 避免来回抵消
+      const cand = nb.filter(idx => idx !== lastMove);
+      const pick = cand[Math.floor(Math.random() * cand.length)];
+      // 交换
+      arr[empty] = arr[pick];
+      arr[pick] = 0;
+      lastMove = empty;
+      empty = pick;
+    }
+    // 如果刚好解开了，再走一步
+    if (isSolved(arr, n)) {
+      const nb = neighborsIdx(empty, n);
+      const pick = nb[Math.floor(Math.random() * nb.length)];
+      arr[empty] = arr[pick];
+      arr[pick] = 0;
+    }
+    return arr;
+  }
+
+  function neighborsIdx(idx, n) {
+    const r = Math.floor(idx / n), c = idx % n;
+    const res = [];
+    if (r > 0) res.push(idx - n);
+    if (r < n - 1) res.push(idx + n);
+    if (c > 0) res.push(idx - 1);
+    if (c < n - 1) res.push(idx + 1);
+    return res;
+  }
+
+  function isSolved(arr, n) {
+    const total = n * n;
+    for (let i = 0; i < total - 1; i++) if (arr[i] !== i + 1) return false;
+    return arr[total - 1] === 0;
+  }
+
+  function computeCellSize() {
+    const maxW = wrap.clientWidth;
+    const maxH = wrap.clientHeight;
+    const availW = maxW > 0 ? maxW : Math.min(window.innerWidth - 30, 440);
+    const availH = maxH > 0 ? maxH : Math.min(window.innerHeight - 220, 600);
+    const sizeByW = Math.floor(availW / N);
+    const sizeByH = Math.floor(availH / N);
+    cellSize = Math.max(20, Math.min(sizeByW, sizeByH));
+    const cw = N * cellSize, ch = N * cellSize;
+    if (boardCanvas.width !== cw || boardCanvas.height !== ch) {
+      boardCanvas.width = cw;
+      boardCanvas.height = ch;
+    }
+    boardCanvas.style.width = cw + 'px';
+    boardCanvas.style.height = ch + 'px';
+  }
+
+  // ---------- 绘制 ----------
+  function draw() {
+    const W = boardCanvas.width, H = boardCanvas.height;
+    if (W === 0 || H === 0) return;
+
+    ctx.fillStyle = '#0d0f12';
+    ctx.fillRect(0, 0, W, H);
+
+    for (let i = 0; i < N * N; i++) {
+      const val = tiles[i];
+      if (val === 0) continue;
+      const r = Math.floor(i / N), c = i % N;
+      const px = c * cellSize, py = r * cellSize;
+
+      // 数字正确位置的高亮
+      const correct = (val === i + 1);
+      ctx.fillStyle = correct ? '#2b4a38' : '#262a32';
+      ctx.fillRect(px + 2, py + 2, cellSize - 4, cellSize - 4);
+
+      ctx.strokeStyle = correct ? '#3f7a5a' : '#3a404b';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(px + 2, py + 2, cellSize - 4, cellSize - 4);
+
+      ctx.fillStyle = correct ? '#9fe6c0' : '#d8d8d8';
+      ctx.font = 'bold ' + Math.floor(cellSize * 0.4) + 'px Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(String(val), px + cellSize/2, py + cellSize/2 + 1);
+    }
+
+    if (solved) {
+      ctx.fillStyle = 'rgba(0,0,0,.72)';
+      ctx.fillRect(0, 0, W, H);
+      ctx.font = 'bold ' + Math.floor(Math.min(W, H) * 0.1) + 'px Arial, sans-serif';
+      ctx.fillStyle = '#7ee0a0';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('完成！', W/2, H/2);
+    }
+  }
+
+  function updateUI() {
+    moveDisplay.textContent = moves;
+    timeDisplay.textContent = seconds;
+    sizeDisplay.textContent = N + '×' + N;
+  }
+
+  function startTimer() {
+    if (timer) clearInterval(timer);
+    timer = setInterval(() => {
+      if (!solved) { seconds++; timeDisplay.textContent = seconds; }
+    }, 1000);
+  }
+
+  // ---------- 移动 ----------
+  function tryMove(idx) {
+    if (solved) return;
+    const empty = tiles.indexOf(0);
+    if (!neighborsIdx(empty, N).includes(idx)) return;  // 不相邻
+    tiles[empty] = tiles[idx];
+    tiles[idx] = 0;
+    moves++;
+    updateUI();
+    if (moves === 1) startTimer();
+    draw();
+    checkSolved();
+  }
+
+  function checkSolved() {
+    if (isSolved(tiles, N)) {
+      solved = true;
+      if (timer) { clearInterval(timer); timer = null; }
+      try {
+        const best = JSON.parse(localStorage.getItem(BEST_KEY) || '{}');
+        const key = 'n' + N;
+        if (!best[key] || moves < best[key].moves) {
+          best[key] = { moves: moves, time: seconds };
+          localStorage.setItem(BEST_KEY, JSON.stringify(best));
+        }
+      } catch(e) {}
+      draw();
+    }
+  }
+
+  // ---------- 输入 ----------
+  let touchUsed = false;
+
+  function getIndexFromEvent(e) {
+    const rect = boardCanvas.getBoundingClientRect();
+    let clientX, clientY;
+    if (e.changedTouches && e.changedTouches.length) {
+      clientX = e.changedTouches[0].clientX;
+      clientY = e.changedTouches[0].clientY;
+    } else if (e.touches && e.touches.length) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+    const c = Math.floor((clientX - rect.left) / rect.width * N);
+    const r = Math.floor((clientY - rect.top) / rect.height * N);
+    if (c < 0 || c >= N || r < 0 || r >= N) return -1;
+    return r * N + c;
+  }
+
+  function handleTap(e) {
+    const idx = getIndexFromEvent(e);
+    if (idx >= 0) tryMove(idx);
+  }
+
+  boardCanvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    touchUsed = true;
+    handleTap(e);
+  }, { passive: false });
+
+  boardCanvas.addEventListener('mousedown', (e) => {
+    if (touchUsed) return;
+    handleTap(e);
+  });
+  boardCanvas.addEventListener('mouseup', () => { touchUsed = false; });
+
+  // ---------- 按钮 ----------
+  resetBtn.addEventListener('click', initGame);
+  resetBtn.addEventListener('touchstart', (e) => { e.preventDefault(); initGame(); }, { passive: false });
+
+  function openSize() {
+    sizeOverlay.querySelectorAll('.level-btn[data-size]').forEach(btn => {
+      btn.classList.toggle('active', parseInt(btn.dataset.size, 10) === N);
+    });
+    sizeOverlay.classList.remove('hidden');
+  }
+  sizeBtn.addEventListener('click', openSize);
+  sizeBtn.addEventListener('touchstart', (e) => { e.preventDefault(); openSize(); }, { passive: false });
+
+  sizeOverlay.querySelectorAll('.level-btn[data-size]').forEach(btn => {
+    const handler = (e) => {
+      e.preventDefault();
+      N = parseInt(btn.dataset.size, 10);
+      sizeOverlay.classList.add('hidden');
+      initGame();
+    };
+    btn.addEventListener('click', handler);
+    btn.addEventListener('touchstart', handler, { passive: false });
+  });
+  sizeClose.addEventListener('click', () => sizeOverlay.classList.add('hidden'));
+  sizeClose.addEventListener('touchstart', (e) => { e.preventDefault(); sizeOverlay.classList.add('hidden'); }, { passive: false });
+
+  window.addEventListener('resize', () => { computeCellSize(); draw(); });
+  window.addEventListener('orientationchange', () => { setTimeout(() => { computeCellSize(); draw(); }, 200); });
+
+  initGame();
+})();
+</script>
+</body>
+</html>

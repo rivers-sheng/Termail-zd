@@ -1,0 +1,269 @@
+Termail v6.2 Pro → v6.2 final 更新说明
+版本号：6.2.0_Pro → 6.2.0_final（versionCode 12 → 12，标签 Termail_v6.2_Pro → Termail_final）
+
+一、新增
+新命令源文件（6 个）
+
+commands/many4.cpp → registerMany4Commands：约 60 个实用命令
+
+文件管理：open、share、mount-sd
+
+网络：ip-info、http-get、port-check、dns-flush、speedtest
+
+系统：meminfo、cpu-temp、battery、disk-usage、process-top、kill-all
+
+文本：md5、json-format、hex-view、diff-color
+
+终端：title、copy（覆盖 system 里的同名）、paste-clip、bell、notify、font-list
+
+工具：pass-gen、base64-decode、url-encode、url-decode、timestamp、random-str、uuid-batch
+
+游戏：game-score、pong
+
+会话：session-rename、session-info、session-export
+
+监控：watch-cpu、watch-mem、watch-battery、watch-net
+
+commands/config_commands.cpp → registerConfigCommands
+
+backup：备份 custom_commands.json、aliases.json、.ssh 到 termail-backup-<时间戳> 目录
+
+restore <备份目录>：恢复配置
+
+export-config：导出 JSON（含自定义命令、别名、字号）
+
+import-config <文件>：导入 JSON
+
+reset-all -y：删除配置目录，清空内存配置
+
+config-info：显示配置目录、数量、文件大小
+
+commands/about_commands.cpp → registerAboutCommands
+
+welcome：重新显示欢迎信息
+
+about：软件信息
+
+changelog：更新日志
+
+tips：随机使用技巧（30 条）
+
+version：版本号、Qt 版本、编译时间
+
+commands/enhanced_commands.cpp → registerEnhancedCommands
+
+multi：; 分隔串行执行
+
+parallel：& 分隔并行执行（QProcess 异步）
+
+repeat <次数> <命令>：重复执行（上限 1000）
+
+benchmark <命令> / timeit：QElapsedTimer 测耗时
+
+seq-exec <起> <止> <模板>：$1 替换批量执行（上限 100）
+
+xarg <命令> <参数...>：逐参数执行
+
+until <次数> <命令>：循环执行（上限 100，默认 10）
+
+now：多格式时间输出
+
+countdown <秒>：倒计时（1-3600 秒，结束 QApplication::beep）
+
+commands/notify_commands.cpp → registerNotifyCommands（Android 专用）
+
+notify-on / notify-off：通过 JNI 调用 TermailService.start/stop
+
+wakelock [status]：切换/查询唤醒锁
+
+notify-status：通知栏状态
+
+commands/session_commands.cpp 增强（v6.2 Pro 已有，本次内容未变）
+
+Android 通知栏服务
+
+Manifest 新增 <service android:name="com.termail.terminal.TermailService" android:foregroundServiceType="dataSync" />
+
+新增权限：FOREGROUND_SERVICE、WAKE_LOCK、POST_NOTIFICATIONS、FOREGROUND_SERVICE_DATA_SYNC
+
+Activity 新增 SEND intent-filter（text/plain），支持从其他应用分享文本到 Termail
+
+main.cpp 新增能力
+
+crashHandler()：std::set_terminate 注册，异常退出时写 crash.log
+
+handleSharedText()：Android 通过 JNI 读取 getIntent，处理 ACTION_SEND 的 EXTRA_TEXT
+
+Android 启动时自动调 TermailService.start
+
+terminal.cpp / terminal.h 增强
+
+logCommand()：每条命令追加到 .termail_cmd.log，超 1MB 保留后 512KB
+
+saveHistory()：历史记录 QDataStream 序列化 + XOR 0x5A 写 history.dat
+
+vibrate(int ms)：Android JNI 震动（onCommandEntered 中调用 50ms）
+
+suggestCommand()：命令未找到时按 1 字符差异或前缀给出建议
+
+switchSession()：切换前 kill 当前 currentProcess 与 interactiveProcess
+
+析构函数新增：Network2Cleanup::cleanup()、停 statusTimer、kill currentProcess
+
+appendOutput()：判断滚动条是否在底部，仅在底部时自动滚到底部
+
+高危命令列表扩充：rm -fr、dd if=/dd of=、wipefs、mkswap、swapoff、chmod 777、chown root
+
+utils.cpp 增强
+
+全局 QAtomicInt g_processCount，超 10 个并发进程拒绝执行
+
+进程结束/启动失败时 fetchAndSubOrdered
+
+timeout > 0 才创建定时器（v6.2 Pro 已改，本次沿用）
+
+启动 1 秒后若仍在运行，输出 [执行中] xxx (输入 stop 停止)
+
+many3.cpp 里 seq 命令
+
+与 v6.2 Pro 一致
+
+system_commands.cpp 新增
+
+alias 解析重写：args.join(' ') 后按 = 拆分，支持 alias a='ls | grep' 与 alias a="ls | grep"，剥引号后存 aliases 并 saveAliases()
+
+clip [get|set <文本>|clear]：剪贴板操作
+
+brightness <0-100>：Android JNI 设置 screenBrightness
+
+page <文件>：分页查看（30 行/页）
+
+file_commands.cpp 新增
+
+cat 限制 5MB，超出只读前 5MB 并提示截断
+
+snake.cpp / snake.h
+
+窗口高度 ROWS*CELL + 180
+
+底部按钮放大到 80×48，font-size: 22px
+
+棋盘从 16×22 改为 18×20（COLS=18, ROWS=20, CELL=18）
+
+游戏结束时保存最高分到 QSettings("termail","games")
+
+game2048.cpp
+
+mouseReleaseEvent 结束时检查 canMove()，保存最高分到 g2048_high
+
+tetris.cpp
+
+lockPiece() 后若 gameOver 保存最高分到 tetris_high
+
+ssh_commands.cpp
+
+新增 ssh-host 主机管理（add/list/rm/edit/show，存 .ssh/hosts.json）
+
+新增 ssh-connect <主机名>：读 hosts.json 走快速连接
+
+新增 ssh-config-gen：生成 ~/.ssh/config
+
+新增 ssh-keygen-pass：ssh-keygen -p 给密钥加密码
+
+新增 ssh-tunnel <映射> <主机>：ssh -N -L 端口转发
+
+ssh-list 跳过 hosts.json 与 config
+
+proot_commands.cpp
+
+proot-shell 新增“有命令正在运行”检查（currentProcess->state() != NotRunning 则拒绝）
+
+proot-mirror 的 DNS 从 8.8.8.8 改为 119.29.29.29（腾讯 DNS）
+
+proot-setup 提示新增 set-dns 119.29.29.29
+
+pre-position 输出内容扩充：新增 set-dns、SSH 主机管理、通知栏；但代码里有一段重复的 QString output = R"( ... QString output = R"( 嵌套笔误
+
+log_commands.cpp
+
+与 v6.2 Pro 一致（上色、/exit-log、/命令）
+
+AndroidManifest.xml
+
+versionCode 12（未变），versionName 6.2.0_Pro → 6.2.0_final
+
+标签 Termail_v6.2_Pro → Termail_final（application + activity）
+
+新增 <service>、4 个权限、SEND intent-filter
+
+新增 android:icon="@drawable/icon"
+
+CMakeLists.txt
+
+SOURCES 新增：commands/many4.cpp、commands/config_commands.cpp、commands/about_commands.cpp、commands/enhanced_commands.cpp、commands/notify_commands.cpp
+
+QT_ANDROID_APP_NAME："Termail_v6.1" → "Termail_final"（首次与 config.h 对齐）
+
+config.h
+
+APP_NAME："Termail_v6.2_Pro" → "Termail_final"
+
+main.cpp
+
+setApplicationName("Termail_v6.2")（与 config.h 的 Termail_final 又不一致）
+
+setApplicationVersion(APP_VERSION.toUtf8())
+
+新增 setOrganizationName("Termail")
+
+新增 crashHandler、handleSharedText、Android 自动启动服务
+
+二、修改
+commands.h / commands.cpp
+
+新增 5 个注册函数声明与调用：registerMany4Commands、registerConfigCommands、registerAboutCommands、registerEnhancedCommands、registerNotifyCommands
+
+声明 namespace Network2Cleanup { void cleanup(); }
+
+network2_commands.cpp
+
+新增 namespace Network2Cleanup { void cleanup() } 实现，供析构调用
+
+terminal.h
+
+新增 logCommand、vibrate、saveHistory、suggestCommand 声明
+
+utils.h
+
+未变（默认 timeout = 0）
+
+system_commands.cpp
+
+顶部重复 include：#include <QClipboard>、#include <QApplication> 各出现两次
+
+新增 #ifdef Q_OS_ANDROID #include <QJniObject>
+
+三、其他
+main.cpp 的 setApplicationName("Termail_v6.2") 与 config.h 的 APP_NAME = "Termail_final" 不一致
+
+proot_commands.cpp 的 pre-position 里字符串字面量嵌套笔误（QString output = R"( ... QString output = R"(），会导致原始字符串提前结束，编译可能报错或输出异常
+
+snake.cpp 的 tick() 里“撞墙判断”重复出现两次（函数开头一次，末尾又有一段 if (newHead.x() < 0 ...)），逻辑冗余但不会崩溃
+
+enhanced_commands.cpp 的 countdown 用 \r 刷新在 QTextEdit 里不会真的覆盖上一行，会逐行堆叠
+
+enhanced_commands.cpp 的 parallel 用 QProcess* 异步启动，但 ui->appendOutput 在 lambda 里被多线程调用，QTextEdit 非线程安全，存在并发写 UI 的隐患
+
+config_commands.cpp 的 backup/restore 只处理 custom_commands.json、aliases.json、.ssh，未处理字体设置（QSettings）与 .termail_cmd.log
+
+many4.cpp 里 copy 命令覆盖了 file_commands.cpp 的 copy（registerCommand 有防重复注册，先注册的 file_commands.cpp 生效，所以 many4 的 copy 实际被丢弃）
+
+many4.cpp 的 session-* 命令直接访问 ui->sessions[id]，id 不存在时未判断（session-rename 有判，session-info/session-export 有判，session-rename 也判了）
+
+notify_commands.cpp 依赖 com.termail.terminal.TermailService 这个 Java 类，但工程里未提供对应 .java 源码，需在 android/ 目录下自行提供
+
+utils.cpp 的 g_processCount 在 timeout 触发 kill 时未 fetchAndSubOrdered，进程计数可能泄漏（finished 信号会触发减 1，但如果 kill 后 finished 不派发则漏减）
+
+terminal.cpp 的 vibrate 里 vibrator.callMethod<jboolean>("vibrate", "(J)Z", ...) 签名不对，Vibrator.vibrate(long) 返回 void，应为 "vibrate", "(J)V"；且 Android 8+ 需要 VibrationEffect
+
+system_commands.cpp 的 brightness 里 attrs.setField<jdouble>("screenBrightness", brightness) 字段类型应为 float，LayoutParams.screenBrightness 是 float，JNI 传 jdouble 会类型不匹配

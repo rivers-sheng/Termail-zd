@@ -1,0 +1,77 @@
+Termail Games v1.0.0 → v1.1.0 更新说明
+版本号：1.0.0 → 1.1.0（versionCode 1 → 2，包名 com.termail.spical 不变）
+
+一、新增
+游戏列表扩容 18 → 28
+
+htmlgames.cpp 的 g_games 与 help_commands.cpp 的 htmlGames 各新增 10 个游戏：
+
+[19] chinese-chess（中国象棋）
+
+[20] cutting-fruit（切水果）
+
+[21] fireworks（烟花）
+
+[22] flappy-bird（像素鸟）
+
+[23] go（围棋）
+
+[24] gomoku-connect（五子棋）
+
+[25] jump-jump（跳一跳）
+
+[26] mining-world（挖矿世界）
+
+[27] othello（黑白棋）
+
+[28] whack-a-mole（打地鼠）
+
+AndroidManifest.xml 新增 Activity 声明
+
+新增 <activity android:name="com.termail.spical.GameWebView" android:label="Game" ... android:exported="false" />
+
+该 Activity 是 HTML 游戏的实际承载页（WebView），v1.0.0 的 Manifest 里没有声明，靠 JNI 显式 ComponentName 启动会失败，本次补上
+
+help_commands.cpp 的 findGame 编号上限放开
+
+v1.0.0：if (isNum && num >= 1 && num <= 18)
+
+v1.1.0：if (isNum && num >= 1)，不再硬编码 18
+
+权限
+
+Manifest 新增 WAKE_LOCK（游戏 WebView 防息屏）
+
+二、修改
+terminal.cpp 欢迎信息
+
+v1.0.0：带 ╔═══╗ 边框 + Termail Games v1.0.0 标题 + 输入 'games' 查看游戏列表
+
+v1.1.0：改为简洁版 Termail Games特别版，去掉边框与版本号显示，新增 制作:rivers晟 github:jiang-sheng / 辅助制作:deepseek chat / 邮箱 / GPL 版权行
+
+config.h
+
+APP_VERSION："1.0.0" → "1.1.0"
+
+main.cpp
+
+setApplicationVersion("1.0.0") → "1.1.0"
+
+CMakeLists.txt
+
+project(TermailGames VERSION 1.0.0) → 1.1.0
+
+AndroidManifest.xml
+
+versionCode 1 → 2，versionName 1.0.0 → 1.1.0
+
+三、其他
+utils.cpp、utils.h、terminal.h、commands.h、commands.cpp、fun_commands.cpp 与 v1.0.0 内容一致，无改动
+
+htmlgames.cpp 与 help_commands.cpp 仍各自维护一份完全相同的 28 条游戏表（g_games 与 htmlGames），两处需同步修改
+
+help_commands.cpp 的 launchHtmlGame 用 ComponentName("com.termail.spical", "com.termail.spical.GameWebView") 显式启动，htmlgames.cpp 的 HtmlGames::launch 用 QJniObject("com/termail/spical/GameWebView", "(Landroid/content/Context;)V", ...) 构造 Intent，两套启动方式并存，但 help_commands.cpp 实际注册的命令走的是 launchHtmlGame，HtmlGames::launch 未被调用
+
+main.cpp 的 setApplicationVersion("1.1.0") 与 config.h 的 APP_VERSION 一致
+
+Manifest 新增的 GameWebView Activity 是 exported="false"，由同包内 startActivity 启动，符合 Android 要求

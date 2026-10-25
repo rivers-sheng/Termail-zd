@@ -1,0 +1,298 @@
+Termail v5.2 → v5.4 更新说明
+版本号：5.2.0 → 5.4.0（AndroidManifest 标注 5.4.0-bata，versionCode 7 → 8）
+
+一、新增
+终端交互能力
+
+SSH 交互模式：startInteractiveProcess() 支持 ssh 命令进入交互会话，输入内容直接写入子进程 stdin，[SSH会话结束] 后自动退出交互模式
+
+多级递归深度控制：executeInternalCommand(commandLine, int depth) 增加 depth 参数，超过 10 层报「递归深度超限」
+
+命令分隔符支持：&&、||、; 拆分成多条子命令依次执行
+
+高危命令确认机制：rm -rf、dd、mkfs、fdisk、shred、poweroff、reboot、shutdown、su、sudo 前缀拦截，需输入 confirm 二次确认（新增 confirm 命令 + pendingCommand 成员）
+
+别名校验增强：别名展开最多 5 层，检测自引用、递归过深
+
+引号感知：解析前先扫描引号配对，引号内的 |、> 不当作管道/重定向
+
+字体持久化：loadFontSettings() / saveFontSettings() 用 QSettings("termail","terminal") 保存字号，启动自动恢复
+
+Tab 补全增强：
+
+带空格参数时按文件/目录补全，目录自动加 /
+
+命令补全匹配多项时循环切换，并在输出区列出候选
+
+自定义命令
+
+initCommands() 中跳过与内置命令同名的自定义命令（if (cmdRegistry->getCommandNames().contains(name)) continue;）
+
+占位符从 ${1}/${2}... 改为从 ${0} 开始
+
+新增命令
+
+storage [路径|索引]：切换 Android 存储目录（/sdcard、/storage/emulated/0、Download、Documents、DCIM），支持数字索引
+
+file_commands.cpp 强化
+
+cd：路径用 QDir::cleanPath 规范化
+
+ls：隐藏文件改用 QDir::Hidden 过滤器（不再手动过滤）
+
+rm：新增 -r/-f/-rf 参数解析；内置系统目录黑名单（/、/sdcard、/storage、/data、/system、/vendor、/proc、/sys、/dev），命中直接拒绝
+
+tree：增加深度限制（>3 显示 ...）
+
+find：新增 -maxdepth N（默认 3），最多 100 条截断，系统目录黑名单
+
+cp：目标已存在时提示
+
+df：支持指定目录
+
+chmod：八进制位正确映射到 QFileDevice::Permission 逐位设置
+
+which：内置命令改为白名单列表（约 60 项），未命中再查系统路径
+
+fun_commands.cpp 强化
+
+calc：正则校验表达式（仅允许数字/运算符/括号/空格/点），含 () 或非法字符直接报错
+
+cowsay：拒绝含换行的文本
+
+banner：边框从 █ 改为 = 与 |
+
+prime：改用埃氏筛，上限 1,000,000
+
+factor：改用 qint64
+
+minesweeper.cpp 重构
+
+渲染从 Unicode 边框（┌─┬┐）改为 ASCII（+--+），旗子显示 F、未揭开 .
+
+挖雷洗牌用 QRandomGenerator 替代 std::random_device
+
+BFS 队列 QQueue 替代 QVector
+
+输赢提示去掉 emoji
+
+cmenu.cpp 强化
+
+get-busybox 增加 SHA256 校验（预置 expectedHash，当前是占位 TODO 值）
+
+安装后启动 busybox --help 验证可执行，失败删除文件并提示「此设备不支持 busybox 执行」
+
+写文件失败/权限设置失败明确报错
+
+log_commands.cpp
+
+无实质变化（与 v5.2 一致）
+
+many3.cpp 调整
+
+shred：Android 上直接提示不可用，建议用 rm
+
+seq：支持步长为负、步长为 0 报错
+
+exit / logout：退出前调用 saveCustomCommands()
+
+system_commands.cpp 强化
+
+license：只输出前 50 行，超出提示用 cat LICENSE/GPL.txt
+
+confirm：新增，执行 pendingCommand
+
+exit / quit：退出前保存自定义命令
+
+sysinfo：增加 CPU 核心数、磁盘容量
+
+uname：支持 -a
+
+hostname：支持 -I/-i（打印非回环 IPv4）、-f
+
+alias：支持单参数查询（alias name 查值）
+
+history：最多 50 条 + 截断提示
+
+source：循环引用检测（sourceStack）
+
+setfont：额外设置 document()->setDefaultFont() 重渲染
+
+addcmd：命令名拒绝空格/|/>，自动剥离引号
+
+listcmd：显示 command 字段（v5.2 显示的是 desc）
+
+timeout：改为真正起 QProcess 执行，超时 kill
+
+python/gcc/g++/java：Android 无对应环境时给出友好提示
+
+help：helpMap 新增 confirm、storage、ssh 交互说明；部分条目精简
+
+network_commands.cpp 强化
+
+curl：空参数提示，非 http URL 报错
+
+wget：空参数/非 http 提示，下载失败报错详情
+
+nslookup：改用 QEventLoop 同步等待（5 秒超时）
+
+whois：连接失败提示
+
+config.h
+
+Android 字体改为 getFontFamily() 函数，按 Droid Sans Mono → monospace → Courier New 顺序探测
+
+移除 QFontDatabase 相关 include 之外的改动
+
+APP_NAME 从 "Termail_v5.2" 改为 "Termail终端"（回退到通用名）
+
+AndroidManifest.xml
+
+versionCode 7 → 8，versionName 5.2.0 → 5.4.0-bata
+
+标签 Termail_v5.2 → Termail_v5.4-bata
+
+新增权限：MANAGE_EXTERNAL_STORAGE、READ_MEDIA_IMAGES、READ_MEDIA_VIDEO、READ_MEDIA_AUDIO
+
+二、修改
+terminal.h
+
+新增成员：pendingCommand、tabMatchIndex、interactiveProcess、interactiveMode
+
+executeInternalCommand 签名加 int depth = 0
+
+新增私有方法：loadFontSettings、saveFontSettings、startInteractiveProcess
+
+新增 include：QSettings、QAction、QKeySequence
+
+terminal.cpp
+
+构造函数初始化 interactiveProcess、interactiveMode
+
+析构函数新增 saveFontSettings()
+
+onCommandEntered()：交互模式分支、空命令回显、history 上限 1000 条、ssh 检测
+
+executeInternalCommand()：整体重写（递归深度/高危确认/分隔符/引号/别名循环）
+
+executePipeline()：写入等待 waitForBytesWritten(5000)，10MB 输入上限，输出 100KB 截断，收集所有 stderr
+
+executeRedirect()：支持 cmd | pipe > file，缺少文件名报错，覆盖前提示
+
+appendOutput()：HTML 转义追加 ' → &#39;
+
+setupShortcuts()：移除 Tab 快捷键注册（补全改为文件/命令两种逻辑但触发方式变了）
+
+onTabComplete()：重写（文件补全/命令循环切换）
+
+欢迎信息：github 地址改为 rivers-sheng
+
+utils.cpp
+
+runExternal() 新增 errorOccurred 处理（FailedToStart 提示命令未找到）
+
+超时逻辑改为 terminate() → 等待 1 秒 → kill() → 等待 0.5 秒
+
+start() 后额外检查 state() 与 error()，无法启动时提示
+
+main.cpp
+
+app.setApplicationName("Termail_v5.4bata")（注意拼写 bata 而非 beta，与 config.h 的 "Termail终端" 不一致）
+
+非 Android 分支调整为先 resize 后 show
+
+CMakeLists.txt
+
+project(... VERSION 5.4.0)
+
+源文件列表与 v5.2 相同（many1/2/3、log_commands 已在）
+
+cmenu.cpp / many1.cpp / many2.cpp
+
+与 v5.2 基本一致，cmenu.cpp 变化见上
+
+config.h
+
+APP_NAME / APP_VERSION 同步 5.4.0
+
+Android 字体探测逻辑新增
+
+三、其他
+file_commands.cpp 顶部重复 #include <QStorageInfo> 已清除
+
+many3.cpp 里覆盖 stat/file/du/df 等同名命令的问题依旧存在（仍会覆盖前面内置实现）
+
+main.cpp 的应用名 Termail_v5.4bata 与 config.h 的 APP_NAME = "Termail终端" 不一致，且 bata 疑似笔误
+
+get-busybox 的 expectedHash 仍是 TODO 占位值，实际校验可能永远失败（若资源文件 hash 与该值不符）
+
+executeRedirect 对 > 与 >> 的区分仍依赖字符串包含，echo "a>b" 这类引号内内容已通过 inQuote 规避
+
+交互模式（ssh）退出后不会自动回到命令解析，需手动 exit，设计上依赖子进程退出事件
+
+
+Termail v5.4 Bug 清单
+一、崩溃类
+nslookup 悬空引用
+network_commands.cpp：QEventLoop loop 是栈对象，lambda 用 &loop 捕获。5 秒超时后 loop.exec() 返回、loop 析构，若 DNS 回调此时才到，loop.quit() 访问已销毁对象。
+同函数内 bool* done = new bool 被 delete done 后，回调仍可能访问。
+
+mine 命令 static MinesweeperEngine* 绑定旧 ui
+system_commands.cpp：mineEngine 是函数内 static，首次创建时绑定当时 ui。TerminalWidget 若销毁重建，mineEngine->ui 悬空，再执行 mine 访问 ui->appendOutput 崩溃。
+
+日志窗口全局指针悬空
+log_commands.cpp：g_logDialog / g_termailLogDialog 只在 /exit-log 和切换路径置空。用户点窗口关闭按钮时 WA_DeleteOnClose 销毁对象，指针不置空，下次 log 执行 g_logDialog->isVisible() 访问已销毁对象。
+
+cd 无参数且 home 不可用时 args[0] 越界
+file_commands.cpp：失败分支 arg(args.isEmpty() ? "~" : args[0]) 实际写的是 arg(args[0])（无判空），args 为空时越界。
+
+二、功能失效类
+get-busybox SHA256 校验必然失败
+cmenu.cpp：expectedHash 是 TODO 占位值 141adb...b1c3，与实际 busybox 资源不符，每次安装都报「busybox 校验失败」并 return，功能完全不可用。
+
+many3 覆盖同名内置命令导致 Android 失效
+many3.cpp 在最后注册，覆盖了 stat/file/du/df/free/uname/uptime/hostname/watch/tee/yes/seq/shuf/timeout/env/export/source/alias/unalias/history 等。这些改为转发系统命令，Android 上多数不存在，命令直接失效（显示"命令未找到"或静默）。
+
+watch 命令退化
+当前实际生效的是 many3 转发的系统 watch（Android 无）。text_commands.cpp 里的同步 3 次 QThread::sleep(2) 版本被覆盖，不会被执行。
+
+三、逻辑错误类
+别名可绕过高危命令拦截
+terminal.cpp：executeInternalCommand 先做 startsWith("rm -rf") 等高危检测，后做别名展开。alias rmrf='rm -rf /' 后输入 rmrf 不命中检测，展开后执行 rm -rf /。
+
+executeRedirect 不感知引号
+terminal.cpp：commandLine.contains(">>") 与 split(">>") 不判断引号。echo "a>>b" > file 会把引号内 >> 当分隔符，文件名解析错误。
+
+source 循环引用标记异常路径不清理
+system_commands.cpp：sourceStack.append(path) 后若脚本中途异常/提前 return，removeAll(path) 不执行，下次 source 同一文件误报「循环引用」。
+
+find 深度计算受尾斜杠影响
+file_commands.cpp：it.filePath().count('/') - ui->currentDir.count('/')，当 currentDir 以 / 结尾（如 /sdcard/）时计数差 1，maxdepth 判断偏一层。
+
+tabMatchIndex 不重置
+terminal.cpp：onTabComplete() 每次补全递增 tabMatchIndex，用户改动输入内容后不清零，候选循环顺序错乱。
+
+main.cpp 应用名与 config.h 不一致
+main.cpp：setApplicationName("Termail_v5.4bata")；config.h：APP_NAME = "Termail终端"。且 bata 拼写错误。
+
+chmod 在 Android 上静默无效
+file_commands.cpp：逐位设置 QFileDevice::Permission 后直接输出「权限已更改」，但 Android 文件系统限制下 setPermissions 实际不生效，返回 true 但权限未变。
+
+cp 覆盖已存在目标无提示
+file_commands.cpp：QFile::exists(dst) 时输出「目标已存在」但继续执行 QFile::copy，而 QFile::copy 遇到已存在目标会失败（返回 false），代码未检查返回值，仍输出「复制成功」。
+
+rm -f 语义未实现
+file_commands.cpp：-f 被 continue 跳过，rm -f nonexistent 仍走删除失败分支并输出「删除失败」。
+
+四、隐患类
+executePipeline 同步阻塞 UI
+terminal.cpp：每个管道环节 waitForFinished(10000)，长命令卡住时界面冻结最多 10 秒。
+
+prime 逐条输出卡 UI
+fun_commands.cpp：输出 1~100 万内所有素数时每输出一个调用一次 ui->appendOutput，产生大量 HTML 插入与滚动条更新。
+
+interactiveProcess->write() 未检查进程状态
+terminal.cpp：交互模式下直接 write，进程崩溃但 finished 信号尚未派发时写入无效或异常。
+
+file_commands.cpp 顶部重复 include
+#include <QStorageInfo> 出现两次（v5.4 仍在，未清除）

@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>连线消除</title>
+<style>
+  * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #15171c;
+    font-family: Arial, "Microsoft YaHei", sans-serif;
+    overflow: hidden;
+  }
+  body { display: flex; justify-content: center; align-items: center; padding: 6px; }
+
+  .game-container {
+    background: #1d2026;
+    border: 1px solid #333842;
+    padding: 8px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    width: 100%; height: 100%;
+    max-width: 460px;
+  }
+
+  .top-row { display: flex; gap: 6px; width: 100%; flex: 0 0 auto; }
+  .info-box {
+    flex: 1;
+    background: #14161a; border: 1px solid #333842;
+    padding: 4px 10px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .info-box .label { color: #6c7484; font-size: 12px; }
+  .info-box .value { color: #d8d8d8; font-size: 18px; font-weight: bold; }
+
+  .board-wrap {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+  }
+  canvas#board {
+    display: block;
+    background: #0d0f12;
+    border: 1px solid #333842;
+    touch-action: none;
+  }
+
+  .touch-controls { width: 100%; display: flex; flex-direction: column; gap: 5px; flex: 0 0 auto; }
+  .control-row { display: flex; gap: 5px; }
+  .touch-btn {
+    flex: 1;
+    background: #262a32; border: 1px solid #3a404b; color: #cfd4dc;
+    border-radius: 4px; font-size: 14px; font-family: inherit;
+    padding: 11px 0; cursor: pointer;
+  }
+  .touch-btn:active { background: #313742; }
+  .touch-btn.small { font-size: 12px; }
+
+  .hint {
+    text-align: center;
+    color: #6c7484;
+    font-size: 11px;
+    letter-spacing: 1px;
+    margin-top: 2px;
+  }
+
+  .overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.7);
+    display: flex; justify-content: center; align-items: center;
+    z-index: 10;
+  }
+  .overlay.hidden { display: none; }
+  .panel {
+    background: #1d2026; border: 1px solid #3a404b; border-radius: 8px;
+    padding: 20px 24px; min-width: 250px; max-width: 90%;
+    color: #cfd4dc; font-size: 14px;
+  }
+  .panel h3 { margin: 0 0 16px; font-size: 16px; color: #e0e0e0; text-align: center; font-weight: normal; letter-spacing: 2px; }
+  .level-btn {
+    display: block; width: 100%; margin-bottom: 8px;
+    background: #262a32; border: 1px solid #3a404b; color: #cfd4dc;
+    border-radius: 4px; padding: 11px 0; font-family: inherit; font-size: 14px; cursor: pointer;
+  }
+  .level-btn.active { background: #3a4f6b; border-color: #5a7aa0; color: #d8e6ff; }
+  .level-btn:active { background: #313742; }
+  .panel .close { margin-top: 12px; }
+</style>
+</head>
+<body>
+<div class="game-container">
+  <div class="top-row">
+    <div class="info-box">
+      <span class="label">分数</span>
+      <span class="value" id="scoreDisplay">0</span>
+    </div>
+    <div class="info-box">
+      <span class="label">剩余</span>
+      <span class="value" id="leftDisplay">0</span>
+    </div>
+    <div class="info-box">
+      <span class="label">提示</span>
+      <span class="value" id="hintCountDisplay">3</span>
+    </div>
+  </div>
+
+  <div class="board-wrap">
+    <canvas id="board"></canvas>
+  </div>
+
+  <div class="touch-controls">
+    <div class="control-row">
+      <button class="touch-btn" id="hintBtn">提示</button>
+      <button class="touch-btn small" id="shuffleBtn">重排</button>
+      <button class="touch-btn small" id="diffBtn">选难度</button>
+      <button class="touch-btn small" id="resetBtn">重开</button>
+    </div>
+    <div class="hint">点两个同色方块，最多两个拐角可连即消</div>
+  </div>
+</div>
+
+<div class="overlay hidden" id="diffOverlay">
+  <div class="panel">
+    <h3>选择难度</h3>
+    <button class="level-btn" data-cols="6"  data-rows="8"  data-types="6">6 × 8 · 简单 · 6 种</button>
+    <button class="level-btn" data-cols="8"  data-rows="10" data-types="7">8 × 10 · 中等 · 7 种</button>
+    <button class="level-btn" data-cols="10" data-rows="12" data-types="8">10 × 12 · 困难 · 8 种</button>
+    <button class="level-btn close" id="diffClose">取消</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  const boardCanvas = document.getElementById('board');
+  const ctx = boardCanvas.getContext('2d');
+  const wrap = boardCanvas.parentElement;
+  const scoreDisplay = document.getElementById('scoreDisplay');
+  const leftDisplay = document.getElementById('leftDisplay');
+  const hintCountDisplay = document.getElementById('hintCountDisplay');
+  const hintBtn = document.getElementById('hintBtn');
+  const shuffleBtn = document.getElementById('shuffleBtn');
+  const diffBtn = document.getElementById('diffBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const diffOverlay = document.getElementById('diffOverlay');
+  const diffClose = document.getElementById('diffClose');
+
+  let cols = 8, rows = 10, typeCount = 7;
+  let grid;
+  let totalCols, totalRows;
+  let cellSize = 40;
+  let score = 0;
+  let selected = null;
+  let hintCount = 3;
+  let pathLines = [];
+  let pathUntil = 0;
+  let touchUsed = false;
+  let clearing = false;
+
+  const COLORS = ['#ff6f61', '#5cdb95', '#5d9df9', '#f6d365', '#b286fe', '#f9a26c', '#3ec1d3', '#ff8fab', '#a0c4ff', '#c7b9ff'];
+
+  // ---------- 初始化 ----------
+  function initGame() {
+    totalCols = cols + 2;
+    totalRows = rows + 2;
+    const pairs = (cols * rows) / 2;
+    const values = [];
+    for (let i = 0; i < pairs; i++) {
+      const t = (i % typeCount) + 1;
+      values.push(t, t);
+    }
+    for (let i = values.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [values[i], values[j]] = [values[j], values[i]];
+    }
+
+    grid = Array.from({length: totalRows}, () => Array(totalCols).fill(0));
+    let k = 0;
+    for (let r = 1; r <= rows; r++)
+      for (let c = 1; c <= cols; c++)
+        grid[r][c] = values[k++];
+
+    score = 0;
+    selected = null;
+    hintCount = 3;
+    pathLines = [];
+    pathUntil = 0;
+    clearing = false;
+    updateUI();
+    computeCellSize();
+    draw();
+    requestAnimationFrame(() => { computeCellSize(); draw(); });
+  }
+
+  function computeCellSize() {
+    const maxW = wrap.clientWidth;
+    const maxH = wrap.clientHeight;
+    const availW = maxW > 0 ? maxW : Math.min(window.innerWidth - 30, 440);
+    const availH = maxH > 0 ? maxH : Math.min(window.innerHeight - 260, 560);
+    const sByW = Math.floor(availW / (cols + 0.5));
+    const sByH = Math.floor(availH / (rows + 0.5));
+    cellSize = Math.max(20, Math.min(sByW, sByH));
+
+    const cw = Math.round((cols + 0.5) * cellSize);
+    const ch = Math.round((rows + 0.5) * cellSize);
+    if (boardCanvas.width !== cw || boardCanvas.height !== ch) {
+      boardCanvas.width = cw;
+      boardCanvas.height = ch;
+    }
+    boardCanvas.style.width = cw + 'px';
+    boardCanvas.style.height = ch + 'px';
+  }
+
+  // 逻辑坐标 → 画布像素（偏移半格，让外圈也能画线）
+  function cellToXY(r, c) {
+    return {
+      x: (c - 1) * cellSize + cellSize / 2,
+      y: (r - 1) * cellSize + cellSize / 2
+    };
+  }
+
+  // ---------- 绘制 ----------
+  function draw() {
+    const W = boardCanvas.width, H = boardCanvas.height;
+    if (W === 0 || H === 0) return;
+
+    ctx.fillStyle = '#0d0f12';
+    ctx.fillRect(0, 0, W, H);
+
+    for (let r = 1; r <= rows; r++) {
+      for (let c = 1; c <= cols; c++) {
+        const val = grid[r][c];
+        const {x, y} = cellToXY(r, c);
+        const px = x - cellSize / 2, py = y - cellSize / 2;
+        const pad = 2;
+
+        if (val === 0) {
+          ctx.fillStyle = '#141821';
+          ctx.fillRect(px + pad, py + pad, cellSize - pad*2, cellSize - pad*2);
+          continue;
+        }
+        ctx.fillStyle = COLORS[(val - 1) % COLORS.length];
+        ctx.fillRect(px + pad, py + pad, cellSize - pad*2, cellSize - pad*2);
+        ctx.strokeStyle = 'rgba(0,0,0,.3)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(px + pad + 0.5, py + pad + 0.5, cellSize - pad*2 - 1, cellSize - pad*2 - 1);
+
+        if (selected && selected.r === r && selected.c === c) {
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 3;
+          ctx.strokeRect(px + pad, py + pad, cellSize - pad*2, cellSize - pad*2);
+        }
+      }
+    }
+
+    if (Date.now() < pathUntil && pathLines.length > 1) {
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = Math.max(2, cellSize * 0.08);
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      for (let i = 0; i < pathLines.length; i++) {
+        const pt = cellToXY(pathLines[i].r, pathLines[i].c);
+        if (i === 0) ctx.moveTo(pt.x, pt.y);
+        else ctx.lineTo(pt.x, pt.y);
+      }
+      ctx.stroke();
+    }
+
+    if (!clearing && countRemaining() > 0 && !findAnyPair()) {
+      ctx.fillStyle = 'rgba(0,0,0,.7)';
+      ctx.fillRect(0, 0, W, H);
+      ctx.font = 'bold 22px Arial, sans-serif';
+      ctx.fillStyle = '#f6d365';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('无解，点重排', W/2, H/2);
+    }
+
+    if (countRemaining() === 0) {
+      ctx.fillStyle = 'rgba(0,0,0,.72)';
+      ctx.fillRect(0, 0, W, H);
+      ctx.font = 'bold 28px Arial, sans-serif';
+      ctx.fillStyle = '#7ee0a0';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('全部消除！', W/2, H/2);
+    }
+  }
+
+  function updateUI() {
+    scoreDisplay.textContent = score;
+    leftDisplay.textContent = countRemaining();
+    hintCountDisplay.textContent = hintCount;
+  }
+
+  function countRemaining() {
+    let n = 0;
+    for (let r = 1; r <= rows; r++)
+      for (let c = 1; c <= cols; c++)
+        if (grid[r][c] !== 0) n++;
+    return n;
+  }
+
+  // ---------- 连线判定 ----------
+  function canDirectConnect(r1, c1, r2, c2) {
+    if (r1 === r2) {
+      const minC = Math.min(c1, c2), maxC = Math.max(c1, c2);
+      for (let c = minC + 1; c < maxC; c++) {
+        if (grid[r1][c] !== 0) return false;
+      }
+      return true;
+    }
+    if (c1 === c2) {
+      const minR = Math.min(r1, r2), maxR = Math.max(r1, r2);
+      for (let r = minR + 1; r < maxR; r++) {
+        if (grid[r][c1] !== 0) return false;
+      }
+      return true;
+    }
+    return false;
+  }
+
+  function findPath(r1, c1, r2, c2) {
+    // 0 拐角
+    if ((r1 === r2 || c1 === c2) && canDirectConnect(r1, c1, r2, c2)) {
+      return [{r: r1, c: c1}, {r: r2, c: c2}];
+    }
+
+    // 1 拐角
+    if (grid[r1][c2] === 0 &&
+        canDirectConnect(r1, c1, r1, c2) &&
+        canDirectConnect(r1, c2, r2, c2)) {
+      return [{r: r1, c: c1}, {r: r1, c: c2}, {r: r2, c: c2}];
+    }
+    if (grid[r2][c1] === 0 &&
+        canDirectConnect(r1, c1, r2, c1) &&
+        canDirectConnect(r2, c1, r2, c2)) {
+      return [{r: r1, c: c1}, {r: r2, c: c1}, {r: r2, c: c2}];
+    }
+
+    // 2 拐角
+    for (let k = 0; k < totalRows; k++) {
+      if (k === r1 || k === r2) continue;
+      if (grid[k][c1] === 0 && grid[k][c2] === 0 &&
+          canDirectConnect(r1, c1, k, c1) &&
+          canDirectConnect(k, c1, k, c2) &&
+          canDirectConnect(k, c2, r2, c2)) {
+        return [{r: r1, c: c1}, {r: k, c: c1}, {r: k, c: c2}, {r: r2, c: c2}];
+      }
+    }
+    for (let k = 0; k < totalCols; k++) {
+      if (k === c1 || k === c2) continue;
+      if (grid[r1][k] === 0 && grid[r2][k] === 0 &&
+          canDirectConnect(r1, c1, r1, k) &&
+          canDirectConnect(r1, k, r2, k) &&
+          canDirectConnect(r2, k, r2, c2)) {
+        return [{r: r1, c: c1}, {r: r1, c: k}, {r: r2, c: k}, {r: r2, c: c2}];
+      }
+    }
+
+    return null;
+  }
+
+  function findAnyPair() {
+    const list = [];
+    for (let r = 1; r <= rows; r++)
+      for (let c = 1; c <= cols; c++)
+        if (grid[r][c] !== 0) list.push({r, c, v: grid[r][c]});
+    for (let i = 0; i < list.length; i++) {
+      for (let j = i + 1; j < list.length; j++) {
+        if (list[i].v !== list[j].v) continue;
+        if (findPath(list[i].r, list[i].c, list[j].r, list[j].c)) {
+          return [list[i], list[j]];
+        }
+      }
+    }
+    return null;
+  }
+
+  // ---------- 点击处理（坐标换算已修正） ----------
+  function handleTap(e) {
+    if (clearing) return;
+    const rect = boardCanvas.getBoundingClientRect();
+    let clientX, clientY;
+    if (e.changedTouches && e.changedTouches.length) {
+      clientX = e.changedTouches[0].clientX;
+      clientY = e.changedTouches[0].clientY;
+    } else if (e.touches && e.touches.length) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+    // 换算到画布内部像素
+    const px = (clientX - rect.left) / rect.width * boardCanvas.width;
+    const py = (clientY - rect.top) / rect.height * boardCanvas.height;
+
+    // 画布像素 → 格子索引（0 起）→ 逻辑坐标（1 起）
+    const col = Math.floor(px / cellSize);
+    const row = Math.floor(py / cellSize);
+    const c = col + 1;
+    const r = row + 1;
+
+    if (r < 1 || r > rows || c < 1 || c > cols) return;
+    if (grid[r][c] === 0) {
+      selected = null;
+      draw();
+      return;
+    }
+
+    if (!selected) {
+      selected = {r, c};
+      draw();
+      return;
+    }
+
+    if (selected.r === r && selected.c === c) {
+      selected = null;
+      draw();
+      return;
+    }
+
+    const a = selected, b = {r, c};
+    if (grid[a.r][a.c] !== grid[b.r][b.c]) {
+      selected = b;
+      draw();
+      return;
+    }
+
+    const path = findPath(a.r, a.c, b.r, b.c);
+    if (path) {
+      clearPair(a, b, path);
+    } else {
+      selected = b;
+      draw();
+    }
+  }
+
+  function clearPair(a, b, path) {
+    clearing = true;
+    grid[a.r][a.c] = 0;
+    grid[b.r][b.c] = 0;
+    selected = null;
+    score += 10;
+    updateUI();
+
+    pathLines = path;
+    pathUntil = Date.now() + 220;
+    draw();
+
+    setTimeout(() => {
+      pathLines = [];
+      clearing = false;
+      draw();
+      updateUI();
+    }, 220);
+  }
+
+  // ---------- 输入绑定 ----------
+  boardCanvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    touchUsed = true;
+    handleTap(e);
+  }, { passive: false });
+
+  boardCanvas.addEventListener('mousedown', (e) => {
+    if (touchUsed) return;
+    handleTap(e);
+  });
+  boardCanvas.addEventListener('mouseup', () => { touchUsed = false; });
+
+  // ---------- 提示 / 重排 ----------
+  function doHint() {
+    if (clearing) return;
+    if (hintCount <= 0) return;
+    const pair = findAnyPair();
+    if (!pair) return;
+    hintCount--;
+    updateUI();
+    pathLines = [{r: pair[0].r, c: pair[0].c}, {r: pair[1].r, c: pair[1].c}];
+    pathUntil = Date.now() + 900;
+    draw();
+    setTimeout(() => { pathLines = []; draw(); }, 950);
+  }
+  hintBtn.addEventListener('click', doHint);
+  hintBtn.addEventListener('touchstart', (e) => { e.preventDefault(); doHint(); }, { passive: false });
+
+  function doShuffle() {
+    if (clearing) return;
+    const vals = [];
+    for (let r = 1; r <= rows; r++)
+      for (let c = 1; c <= cols; c++)
+        if (grid[r][c] !== 0) vals.push(grid[r][c]);
+    for (let i = vals.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [vals[i], vals[j]] = [vals[j], vals[i]];
+    }
+    let k = 0;
+    for (let r = 1; r <= rows; r++)
+      for (let c = 1; c <= cols; c++)
+        if (grid[r][c] !== 0) grid[r][c] = vals[k++];
+    selected = null;
+    draw();
+  }
+  shuffleBtn.addEventListener('click', doShuffle);
+  shuffleBtn.addEventListener('touchstart', (e) => { e.preventDefault(); doShuffle(); }, { passive: false });
+
+  // ---------- 难度 ----------
+  function openDiff() {
+    diffOverlay.querySelectorAll('.level-btn[data-cols]').forEach(btn => {
+      const match = parseInt(btn.dataset.cols, 10) === cols && parseInt(btn.dataset.rows, 10) === rows;
+      btn.classList.toggle('active', match);
+    });
+    diffOverlay.classList.remove('hidden');
+  }
+  diffBtn.addEventListener('click', openDiff);
+  diffBtn.addEventListener('touchstart', (e) => { e.preventDefault(); openDiff(); }, { passive: false });
+
+  diffOverlay.querySelectorAll('.level-btn[data-cols]').forEach(btn => {
+    const handler = (e) => {
+      e.preventDefault();
+      cols = parseInt(btn.dataset.cols, 10);
+      rows = parseInt(btn.dataset.rows, 10);
+      typeCount = parseInt(btn.dataset.types, 10);
+      diffOverlay.classList.add('hidden');
+      initGame();
+    };
+    btn.addEventListener('click', handler);
+    btn.addEventListener('touchstart', handler, { passive: false });
+  });
+  diffClose.addEventListener('click', () => diffOverlay.classList.add('hidden'));
+  diffClose.addEventListener('touchstart', (e) => { e.preventDefault(); diffOverlay.classList.add('hidden'); }, { passive: false });
+
+  resetBtn.addEventListener('click', initGame);
+  resetBtn.addEventListener('touchstart', (e) => { e.preventDefault(); initGame(); }, { passive: false });
+
+  window.addEventListener('resize', () => { computeCellSize(); draw(); });
+  window.addEventListener('orientationchange', () => { setTimeout(() => { computeCellSize(); draw(); }, 200); });
+
+  initGame();
+})();
+</script>
+</body>
+</html>

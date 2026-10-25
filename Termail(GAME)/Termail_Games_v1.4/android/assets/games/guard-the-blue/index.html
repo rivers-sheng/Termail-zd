@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>守护蔚蓝</title>
+    <link rel="stylesheet" href="./css/style.css">
+    <link rel="icon" type="image/jpeg" href="./draws/icon.jpg">
+</head>
+<body>
+    <audio id="bgm" loop></audio>
+    <audio id="sfx-yes"></audio>
+    <audio id="sfx-no"></audio>
+    <audio id="sfx-get"></audio>
+
+    <div id="audio-ctrl">
+        <button id="audio-toggle" title="开关声音">⏹️</button>
+        <input type="range" id="audio-volume" min="0" max="100" value="70" title="音量">
+        <span id="audio-hint">点击这里开关声音</span>
+    </div>
+
+    <div id="stage">
+        <div class="scene" data-scene="1"><div class="emoji">🌊</div><h1>海洋</h1><p>覆盖地球 <span class="num">71</span>%</p></div>
+        <div class="scene" data-scene="2"><div class="emoji-row">🐟 🐠 🐢 🦈 🐋</div><h1>它孕育了无数生命</h1><p>从最小的浮游生物，到最大的蓝鲸</p></div>
+        <div class="scene" data-scene="3"><h1>可是……</h1></div>
+        <div class="scene" data-scene="4"><div class="emoji-row">🗑️ ♻️ 🥤</div><h1>每分钟</h1><p>有一卡车塑料被倒进海里</p></div>
+        <div class="scene" data-scene="5"><h1 class="big"><span class="counter" data-target="800">0</span> 万吨</h1><p>每年，这么多塑料流入海洋</p></div>
+        <div class="scene" data-scene="6"><div class="emoji-row">🐟 🐠 🐢</div><h1>海洋，正在窒息</h1></div>
+        <div class="scene" data-scene="7"><h1>而这一切</h1><p>和你有关</p></div>
+    </div>
+
+    <button id="skip-btn">跳过 →</button>
+
+    <div id="choice-stage" class="hidden">
+        <div class="status-bar"><span>海洋状态</span><div class="status-track"><div class="status-fill" id="status-fill"></div></div><span id="status-text">50</span></div>
+        <div class="ocean-view" id="ocean-view"></div>
+        <div class="question-box"><p class="question" id="question-text">题目加载中…</p><div class="options" id="options"></div><div class="explain-box hidden" id="explain-box"></div><button class="next-btn hidden" id="next-btn">下一题 →</button></div>
+    </div>
+
+    <div id="result-stage" class="hidden">
+        <div class="result-content" id="result-content"></div>
+        <button class="next-btn" id="result-next-btn">继续 →</button>
+    </div>
+
+    <div id="heart-stage" class="hidden">
+        <div id="heart-tip" class="heart-tip hidden"></div>
+        <div class="heart-wrap">
+            <svg class="heart-svg" id="heart" viewBox="0 0 32 29" xmlns="http://www.w3.org/2000/svg">
+                <path class="heart-body" d="M16 29S2 19 2 10.5C2 5.8 5.8 2 10.5 2C13.1 2 15.4 3.3 16 5C16.6 3.3 18.9 2 21.5 2C26.2 2 30 5.8 30 10.5C30 19 16 29 16 29Z"/>
+                <g class="cracks" id="cracks">
+                    <path class="crack" d="M16 7 L13.5 12 L15 16 L12.5 20 L13 25" />
+                    <path class="crack" d="M13.5 12 L10 13 L8 16" />
+                    <path class="crack" d="M15 16 L18 17 L20 20 L19 24" />
+                    <path class="crack" d="M21 9 L23 13 L22 17 L24.5 21" />
+                    <path class="crack" d="M23 13 L26 14 L28 17" />
+                    <path class="crack" d="M9 11 L6.5 14 L7 18" />
+                    <path class="crack" d="M17 5 L16.5 9" />
+                    <path class="crack" d="M24 19 L21.5 22" />
+                    <path class="crack" d="M12 22 L9 24" />
+                    <path class="crack" d="M19 12 L21 15" />
+                </g>
+            </svg>
+        </div>
+        <div class="heart-score">海洋健康值：<span id="heart-score-num">0</span> / 200</div>
+        <div class="heart-btns">
+            <button class="heart-btn pollute" id="btn-pollute">🗑️ 污染</button>
+            <button class="heart-btn protect" id="btn-protect">♻️ 守护</button>
+        </div>
+    </div>
+
+    <div id="gallery-stage" class="hidden">
+        <div class="gallery-img-wrap"><img id="gallery-img" src="" alt=""></div>
+        <p class="gallery-caption" id="gallery-caption"></p>
+    </div>
+
+    <div id="ending-stage" class="hidden">
+        <div class="ending-content" id="ending-content"></div>
+    </div>
+
+    <div id="final-stage" class="hidden">
+        <div class="final-content">
+            <img class="final-icon" src="./draws/icon.jpg" alt="icon" onerror="this.style.display='none'">
+            <h1 class="final-title">守护蔚蓝</h1>
+            <p class="final-desc">从每一次选择开始</p>
+            <p>（制作:rivers晟 技术参考:runoob.com）</p>
+            <p>（制作不易，愿这片蔚蓝，一直被守护）</p>
+            <div class="final-btns">
+                <span class="final-link" id="restart-btn">↻ 重新开始</span>
+                <span class="final-link" id="show-refs">参考资料</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="references-stage" class="hidden">
+        <div class="wrap">
+            <h1>参考文献</h1>
+            <p class="subtitle">本作品在创作过程中参考的资料来源</p>
+            <h2>一、数据与事实来源</h2>
+            <ul>
+                <li>
+                    <a href="https://www.baike.com/wikiid/5675207392221999278" target="_blank">白色污染</a>
+                   ——“白色污染的类型以及对人类的危害”
+                </li>
+                <li>
+                    <a href="https://baike.baidu.com/item/%E6%B5%B7%E6%B4%8B%E6%B1%A1%E6%9F%93/2444685" target="_blank">百度海洋污染资料</a>
+                    ——“海洋污染的定义、分类、特点及主要污染物”
+                </li>
+                <li>
+                    <a href="https://news.un.org/zh/story/2026/06/1142287" target="_blank">联合国海洋污染资料</a>
+                    ——“《世界海洋评估》报告：每年约 5200 万吨塑料垃圾进入海洋，形成约 24 万亿个微塑料颗粒，影响 4000 多种海洋生物”
+                </li>
+                <li>
+                    <a href="https://news.un.org/zh/story/2026/06/1142279" target="_blank">联合国守护海洋资料</a>
+                    ——“海洋生物多样性广泛衰退；加勒比海珊瑚礁自 20 世纪 70 年代以来减少约 80%”
+                </li>
+                <li>
+                    <a href="https://news.un.org/zh/story/2019/11/1044971" target="_blank">联合国新闻｜环境署：塑料微粒、塑料微珠和一次性塑料制品危害海洋生物及人类健康</a>
+                    —— “每年约 800 万吨塑料进入海洋，相当于每分钟一辆垃圾车向海中倾倒”
+                </li>
+                <li>
+                    <a href="https://www.unep.org/zh-hans/xinwenyuziyuan/gushi/haiyangsuliaoduishanhujiaogouchengxinweixie" target="_blank">联合国环境署｜海洋塑料：对珊瑚礁构成新威胁</a>
+                    —— “每年超过 800 万吨塑料进入海洋”；“如果我们继续保持目前的塑料使用率，到 2050 年还将生产 330 亿吨塑料”
+                </li>
+                <li>
+                    <a href="https://www.un.org/zh/desa/petition-eliminate-plastic" target="_blank">联合国｜全球百万人签署请愿书：未来五年内淘汰一次性塑料制品的使用</a>
+                    —— “每年有超过 800 万吨塑料被遗弃在海洋，占海洋垃圾的 80%”
+                </li>
+                <li>
+                    <a href="https://sanctuaries.noaa.gov/ocean-guardian-recip15/saveourshores.pdf" target="_blank">NOAA（美国国家海洋和大气管理局）｜Save Our Shores</a>
+                    —— “塑料饮料瓶在海洋中的降解时间约 450 年”
+                </li>
+                <li>
+                    <a href="https://wedocs.unep.org/xmlui/bitstream/handle/20.500.11822/9798/-Marine_litter_Vital_graphics-2016MarineLitterVG.pdf" target="_blank">UNEP/GRID-Arendal｜Marine Litter Vital Graphics</a>
+                    —— “塑料在海洋环境中的降解时间：数百年到数千年”
+                </li>
+                <li>
+                    <a href="https://wedocs.unep.org/xmlui/bitstream/handle/20.500.11822/36965/POLSOLSum_CH.pdf" target="_blank">UNEP｜从污染到解决：全球海洋垃圾和塑料污染评估</a>
+                    —— 塑料对海洋生物的影响（摄入、缠绕、微塑料毒理危害）
+                </li>
+            </ul>
+            <h2>二、素材来源</h2>
+            <ul>
+                <strong>音频素材</strong>：
+                <li>
+                    <a href="https://pixabay.com/music/search" target="_blank">音效提供 其它.mp3文件</a>
+                </li>
+                <li>
+                    <a href="https://pixabay.com/zh/music/modern-classical-deep-ocean-313741/" target="_blank">音乐 Deep Ocean</a>
+                    ——文件"music mp3\start.mp3"
+                </li>
+                <li>
+                    <a href="https://pixabay.com/zh/music/modern-classical-abyssal-drift-ocean-lullaby-507820/" target="_blank">音乐 Abyssal Drift</a>
+                    ——文件"music mp3\eend.mp3"
+                </li>
+                <strong>图片素材</strong>：
+                <li>
+                    <a href="https://pixabay.com/zh/vectors/" target="_blank">矢量图标</a>
+                    ——矢量图标
+                </li>
+                <p>注：在pixabay.com所获得的资源均为免版税图片</P>
+                <h3>所有景物均为实景拍摄，均在[黄厝沙滩(环岛路)]，[十里长堤(集美学村)]拍摄，所拍摄的垃圾均为沙滩上实地垃圾(不是摆拍)，所拍摄的垃圾均在拍摄后清理完成</h3>
+            </ul>
+            <h2>三、技术参考</h2>
+            <ul>
+                <li>
+                    <a href="https://www.runoob.com/html/html-tutorial.html" target="_blank">html菜鸟教程</a>
+                    -关于html文件的编写
+                </li>
+                <li>
+                    <a href="https://www.runoob.com/css/css-tutorial.html" target="_blank">css菜鸟教程</a>
+                    -关于css文件的组织
+                </li>
+                <li>
+                    <a href="https://www.runoob.com/js/js-tutorial.html" target="_blank">js菜鸟教程</a>
+                    -关于JavaScript的动画
+                </li>
+                <li>
+                    <a href="https://github.com/xCss/Welcome8.1" target="_blank">文件结构参考</a>
+                    -关于文件结构的参考
+                </li>
+            </ul>
+            <span class="back" id="hide-refs">← 返回作品</span>
+        </div>
+    </div>
+
+    <script src="./js/audio.js"></script>
+    <script src="./js/choices.js"></script>
+    <script src="./js/heart.js"></script>
+    <script src="./js/gallery.js"></script>
+    <script src="./js/ending.js"></script>
+    <script src="./js/final.js"></script>
+    <script src="./js/main.js"></script>
+</body>
+</html>

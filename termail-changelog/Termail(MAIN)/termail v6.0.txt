@@ -1,0 +1,137 @@
+Termail v5.4 → v6.0 更新说明
+版本号：5.4.0-bata → 6.0.0（versionCode 8 → 9，标签 Termail_v5.4-bata → Termail_v6）
+
+一、新增
+自定义命令注册去重
+
+commands.cpp registerCommand() 新增 if (commands.contains(name)) return;，同名命令不再覆盖。many3 之前覆盖内置命令的问题在注册层被阻断。
+
+help 命令精简
+
+helpMap 条目大幅削减，只保留约 40 个常用命令，新增 confirm。
+
+helpMap 结构变化
+
+从 v5.4 的 200+ 条缩减为 v6.0 的约 40 条，大量 many1/2/3 命令的说明条目被删除，help <命令名> 对它们会返回「未找到」。
+
+日志窗口支持两个互切
+
+v5.4 的 /log-termail、/log 互切逻辑在 v6.0 中被删除，两个窗口只能通过 /exit-log 关闭。
+
+二、修改
+terminal.cpp
+
+移除 handleEasterEgg 里的 lower == "上上下下左右左右BA"（大写版），只保留小写版
+
+initCommands() 自定义命令占位符循环中 args.size() 判空仍在，但 ${N} 索引从 i 开始（v5.4 是 i 和 i+1 都替换）
+
+构造函数成员初始化顺序调整：tabMatchIndex、interactiveMode、interactiveProcess 放到 currentProcess 之后
+
+executeInternalCommand 高危命令列表精简：v5.4 有 su、sudo，v6.0 删除这两项
+
+startInteractiveProcess() 提示文案简化（[交互模式，exit 退出]）
+
+移除 #include <QClipboard>、<QThread>、<QKeyEvent>
+
+config.h
+
+Android 字体 Droid Sans Mono/探测函数 → 固定 monospace
+
+删除 getFontFamily() 函数及相关 <QFontDatabase> include
+
+main.cpp
+
+setApplicationName("Termail_v6")，与 config.h 的 APP_NAME = "Termail终端" 仍不一致
+
+CMakeLists.txt
+
+版本 6.0.0，源文件顺序调整（cmenu.cpp 提到 many1 之前），资源顺序调整
+
+移除 CMAKE_AUTORCC、CMAKE_AUTOUIC
+
+cmenu.cpp
+
+get-busybox 删除 SHA256 校验逻辑，仅保留写入 + setPermissions
+
+删除 --help 验证执行步骤
+
+资源路径 :/resources/busybox/busybox 不变
+
+file_commands.cpp
+
+cd 失败提示 arg(args[0]) 仍无判空（v5.4 已存在的问题保留）
+
+find 移除 -maxdepth 参数解析，固定最多 100 条
+
+chmod 失败分支全部删除（无 ok 检查、无输出）
+
+which 移除内置命令白名单，只查 QStandardPaths::findExecutable
+
+many3.cpp
+
+移除 updatedb、info、expand、unexpand、timedatectl、nft、iwlist、resolvectl、hostid、getconf、unset
+
+shred 保留 Android 不可用提示
+
+移除 exit/logout 重注册（v5.4 存在）
+
+many1.cpp / many2.cpp
+
+many1 移除 flex、zmore、zipinfo、unzipsfx、tftp
+
+many2 移除 mkfs.ext3、mkfs.ext4、mkfs.vfat、sar、mpstat、sdparm、hwinfo、bg、fg、groupmod、chage、lastlog、init、runlevel
+
+network_commands.cpp
+
+nslookup 依旧 &loop 捕获栈引用（悬空问题未改）
+
+system_commands.cpp
+
+help 注册元数据 usage 从 "help [命令名]" 改为 "help"
+
+license 移除超出提示（只输出前 50 行，无提示）
+
+hostname 移除 -f
+
+who 简化为 username + " pts/0"（无时间）
+
+history 移除超 50 条截断提示
+
+source 移除 v5.4 的循环引用检测（sourceStack 没了）
+
+addcmd 保留命令名特殊字符校验
+
+timeout 保留 QProcess 实现
+
+mine 的 static MinesweeperEngine* 保留
+
+text_commands.cpp
+
+seq 命令被移除（many3 中仍有）
+
+timeout 命令被移除（system 中仍有）
+
+crontab、at、batch 被移除
+
+shuf 的随机源从 std::random_device 改为 QRandomGenerator::global()->generate()
+
+minesweeper.cpp
+
+渲染边框从 +--+ 保留，旗子 F、未揭开 .，与 v5.4 一致
+
+AndroidManifest.xml
+
+versionCode 8 → 9，versionName 5.4.0-bata → 6.0.0
+
+标签 Termail_v5.4-bata → Termail_v6
+
+移除权限：MANAGE_EXTERNAL_STORAGE、READ_MEDIA_IMAGES、READ_MEDIA_VIDEO、READ_MEDIA_AUDIO
+
+三、其他
+commands.cpp 的 registerCommand 去重使 many3 不再覆盖内置同名命令，v5.4 的「many3 覆盖内置」bug 在此版被修复
+
+file_commands.cpp 顶部重复 #include <QStorageInfo> 已清除
+
+nslookup 的 &loop 悬空、mineEngine 绑旧 ui、日志窗口全局指针悬空、cd 无参数越界、别名绕过高危检测、executeRedirect 引号问题、source 循环标记等问题在 v6.0 中均未修复（部分因代码删除而不再相关，如 source 的 sourceStack 被整体移除）
+
+main.cpp 应用名 Termail_v6 与 config.h 的 APP_NAME 仍不一致
