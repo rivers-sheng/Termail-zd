@@ -4,7 +4,7 @@ export ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/25.1.8937393
 export QT_ANDROID=/home/sheng/Qt6_android/6.5.0/android_arm64_v8a
 export QT_HOST=/home/sheng/Qt6_host/6.5.0/gcc_64
 
-cd /home/sheng/Termail_v5
+cd /home/sheng/Termail_v5.1
 rm -rf build_android
 mkdir build_android && cd build_android
 

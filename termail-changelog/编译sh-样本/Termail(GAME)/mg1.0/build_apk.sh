@@ -19,7 +19,7 @@ echo -e "${BLUE}  Termail Games 构建脚本${NC}"
 echo -e "${BLUE}═══════════════════════════════════════${NC}"
 echo ""
 
-cd /home/sheng/Termail_Games
+cd /home/sheng/Termail_Games_v1.0
 rm -rf build_android
 mkdir build_android && cd build_android
 

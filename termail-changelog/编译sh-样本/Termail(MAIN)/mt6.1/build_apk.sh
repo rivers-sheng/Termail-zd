@@ -36,7 +36,7 @@ print_error() {
 # ---------- 开始 ----------
 echo ""
 echo -e "${BLUE}═══════════════════════════════════════${NC}"
-echo -e "${BLUE}  Termail v6.1 beta 构建脚本${NC}"
+echo -e "${BLUE}  Termail v6.1 构建脚本${NC}"
 echo -e "${BLUE}═══════════════════════════════════════${NC}"
 echo ""
 

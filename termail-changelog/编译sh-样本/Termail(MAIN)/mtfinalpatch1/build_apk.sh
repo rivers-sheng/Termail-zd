@@ -42,9 +42,9 @@ echo ""
 
 # ---------- 清理旧构建 ----------
 print_step "清理旧构建目录..."
-rm -rf /home/sheng/Termail/build_android
-mkdir -p /home/sheng/Termail/build_android
-cd /home/sheng/Termail/build_android
+rm -rf /home/sheng/Termail_final_patch1/build_android
+mkdir -p /home/sheng/Termail_final_patch1/build_android
+cd /home/sheng/Termail_final_patch1/build_android
 print_ok "清理完成"
 
 # ---------- CMake 配置 ----------
