@@ -1,0 +1,10 @@
+{
+  "myip": {
+    "command": "curl ifconfig.me",
+    "desc": "查看公网IP"
+  },
+  "weather": {
+    "command": "curl wttr.in/${1}",
+    "desc": "查看天气"
+  }
+}

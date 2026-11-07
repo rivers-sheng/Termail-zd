@@ -1,0 +1,23 @@
+# Termail v6.5.1 更新日志
+
+## 更新
+- 版本号从 6.5.0 升级至 6.5.1（`CMakeLists`、`config.h`、`main.cpp`、`AndroidManifest` 一致）
+- busybox 打包方式改造：Android 下通过 POST_BUILD 将 `resources/busybox/busybox` 复制为 `libs/arm64-v8a/libbusybox.so`，绕过 Gradle 过滤；`bb` 与 `proot-setup` 改为从 `applicationDirPath()/libbusybox.so` 调用，`get-busybox` 变为提示已内置
+- `executeInternalCommand` 增加 `confirm` 命令的防死循环前置处理：待确认命令执行后立即清空 `pendingCommand`，避免被高危检测再次拦截
+- PRoot 安装与解压逻辑修正：解压改用 `tar -xf`（去掉 `-z`），完成校验从 `/bin` 改为 `/bin/sh`；`proot-shell` 补 `PROOT_NO_SECCOMP=1` 与 `/sdcard` 挂载；`proot-mirror`、`set-dns` 改用 `export PROOT_TMP_DIR` 方式
+- `serve` HTTP 服务器权限与界面升级：页面外壳改为 CSS 变量主题，新增当前目录跟随、递归搜索（上限 500）、批量下载、新建文件、上传进度条、`/admin/manage` 统一管理入口（改权限 / 改密码 / 授予 ROOT / 撤销 ROOT / 删除），新增普通用户对 `http_users.json`、`.termail_cmd.log` 等敏感文件的访问拦截
+- `rm` / `rmdir` 增加安全防护：禁止删除根目录及系统关键目录，系统保护路径先检测 root 权限，实际删除交由底层 `rm -rf` 执行
+- `cat` 读取失败提示更明确，保留 5MB 截断
+- `alias` 简化实现，支持带引号含管道写法
+- `about` / `welcome` 中 GitHub 地址更新为 `rivers-sheng`，许可更新为 AGPL
+- `AndroidManifest` 的 `versionCode` 更新为 15
+
+## 新增
+- `editor_dialog` 增加行号显示：新增 `QPlainTextEdit` 行号栏、滚动同步、`toggleLineNumbers` / `updateLineNumbers` / `updateLineNumberArea`，工具栏改为 `QGridLayout` 自适应布局
+- HTTP 服务器新增 `/touch`（新建文件）、`/batch-download`（批量打包下载到临时目录）、上传进度条
+- `proot-shell` 支持传参执行单条命令，默认进入 `/bin/sh`
+
+## 删除
+- `get-busybox` 释放 busybox 到当前目录的逻辑（改为内置 `libbusybox.so`）
+- `cmenu` 命令中的 busybox 安装说明与示例条目精简
+- `changelog` 命令的详细版本列表（改为指向 GitHub 仓库链接）
