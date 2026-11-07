@@ -546,6 +546,11 @@ static void handleRequest(QTcpSocket* client, const QString& request, TerminalWi
     QMap<QString, HttpUser> users = loadUsers();
     QString username = currentUser(headers);
 
+    // ====== 恢复终端日志打印 ======
+    ui->appendOutput(QString("[%1] %2 %3 (user=%4)\n")
+        .arg(QDateTime::currentDateTime().toString("hh:mm:ss"),
+             method, rawPath, username.isEmpty() ? "-" : username), INFO_COLOR);
+
     if (urlPath == "/login" && method == "GET") {
         if (!username.isEmpty()) { redirect(client, "/"); return; }
         sendResponse(client, 200, "text/html; charset=utf-8", loginPage().toUtf8());
