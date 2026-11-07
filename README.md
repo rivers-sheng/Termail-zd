@@ -4,8 +4,12 @@
 
 底层基于 **C++** 与 **Qt6** 构建，将极客级的终端体验完美复刻到了移动端。它不仅仅是一个简单的命令执行器，更内置了网络服务、脚本引擎与海量游戏。
 
-**[点击此处下载最新MAIN版](https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_final_patch2.apk)**
+**[点击此处下载最新MAIN版](https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_final_patch3.apk)**
+
 **[点击此处下载最新GAME版](https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(GAME)/TermailGames_v1.4.apk)**
+
+### 特别注意：请下载最新版，以避免以前版本导致出现bug
+
 ## ✨ 核心特性
 
 ### 🖥️ 沉浸式终端体验
@@ -33,6 +37,10 @@
 - **UI 框架**：Qt 6 (Widgets & Core)
 - **跨平台支持**：Android (NDK) / 桌面端
 - **构建系统**：CMake + Gradle
+
+## ⬆️ 更新日志
+
+> **[点击此处查看所有更新日志](https://github.com/rivers-sheng/Termail-zd/tree/main/termail-changelog)**
 
 ## 📄 开源协议
 本项目基于 GNU Affero General Public License v3.0 (AGPL-3.0) 协议开源。
