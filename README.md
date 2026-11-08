@@ -9,6 +9,7 @@
 **[点击此处下载最新GAME版](https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(GAME)/TermailGames_v1.4.apk)**
 
 ### 特别注意：请下载最新版，以避免以前版本导致出现bug
+- 本程序及其依赖安卓系统
 
 ## ✨ 核心特性
 
