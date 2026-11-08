@@ -17,7 +17,7 @@ This project (Termail) incorporates or bundles the following third-party compone
   * **License:** GPL-2.0-or-later
   * **Source:** https://github.com/proot-me/proot
 
-* **BusyBox** (Core utilities)
+* **BusyBox** ((Bundled in historical versions prior to `v6.5.1`))
   * **License:** GPL-2.0 only
   * **Source:** https://busybox.net/downloads/
 
