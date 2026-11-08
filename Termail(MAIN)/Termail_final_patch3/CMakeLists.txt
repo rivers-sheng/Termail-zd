@@ -55,7 +55,6 @@ qt_add_resources(${PROJECT_NAME} "termail_resources"
     PREFIX "/"
     FILES
         resources/custom_commands.json
-        resources/busybox/busybox
         resources/proot/proot
         resources/proot/alpine.tar
         LICENSE/GPL.txt
@@ -82,17 +81,4 @@ if(ANDROID)
         QT_ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/android"
     )
 
-    # =========================================================
-    # 强行把 busybox 复制到 libs 目录并改名为 .so，绕过 Gradle 过滤
-    # =========================================================
-    set(BUSYBOX_SRC "${CMAKE_CURRENT_SOURCE_DIR}/resources/busybox/busybox")
-    # Qt 默认编译输出库的目录通常在这个位置，Gradle 会扫描这个目录下的 .so
-    set(ANDROID_LIBS_DIR "${CMAKE_CURRENT_BINARY_DIR}/android-build/libs/arm64-v8a")
-    set(BUSYBOX_DST "${ANDROID_LIBS_DIR}/libbusybox.so")
-
-    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${ANDROID_LIBS_DIR}"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${BUSYBOX_SRC}" "${BUSYBOX_DST}"
-        COMMENT "Force packaging busybox as libbusybox.so"
-    )
 endif()
