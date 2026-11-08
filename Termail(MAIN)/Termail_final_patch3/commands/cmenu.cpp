@@ -4,43 +4,52 @@
 
 #include <QFile>
 #include <QDir>
-#include <QCryptographicHash>
 #include <QCoreApplication>
-#include <QStandardPaths>
 
 void CommandRegistry::registerCmenuCommands(TerminalWidget* ui) {
 
     registerCommand("cmenu", [ui](const QStringList&) {
         QString output = R"(
 ════════════════════════════════════════
-           busybox 扩展命令菜单
+           扩展命令菜单
 ════════════════════════════════════════
   使用方法:
      bb <命令> [参数]
+
+  示例:
+     bb ls -la
+     bb tar -xzf archive.tar.gz
+     bb grep "text" file.txt
 ════════════════════════════════════════
 )";
         ui->appendOutput(output, ACCENT_COLOR);
-    }, "busybox菜单", "cmenu");
+    }, "扩展菜单", "cmenu");
 
     registerCommand("get-busybox", [ui](const QStringList&) {
-        ui->appendOutput("新版已内置 busybox，直接使用 bb <命令> 即可。\n", INFO_COLOR);
-    }, "安装busybox", "get-busybox");
+        ui->appendOutput("新版已无需手动安装，直接使用 bb <命令> 即可。\n", INFO_COLOR);
+    }, "安装提示", "get-busybox");
 
     registerCommand("bb", [ui](const QStringList& args) {
         if (args.isEmpty()) {
-            ui->appendOutput("用法: bb <busybox命令> [参数]\n", ERROR_COLOR);
+            ui->appendOutput("用法: bb <命令> [参数]\n", ERROR_COLOR);
             return;
         }
 
-        // 直接从 native 库目录读取
-        QString busyboxPath = QCoreApplication::applicationDirPath() + "/libbusybox.so";
+        // 动态检测系统可用的扩展工具
+        QString sysTool;
+        if (QFile::exists("/system/bin/toybox")) {
+            sysTool = "/system/bin/toybox";
+        } else if (QFile::exists("/system/bin/busybox")) {
+            sysTool = "/system/bin/busybox";
+        }
 
-        if (!QFile::exists(busyboxPath)) {
-            ui->appendOutput(QString("未找到内置的 busybox (%1)。\n").arg(busyboxPath), ERROR_COLOR);
+        if (sysTool.isEmpty()) {
+            ui->appendOutput("错误: 系统未提供 toybox 或 busybox，无法执行扩展命令。\n", ERROR_COLOR);
+            ui->appendOutput("建议使用 proot-setup 安装完整 Linux 环境。\n", INFO_COLOR);
             return;
         }
 
-        // 直接执行 (这个目录内核允许 exec)
-        CommandHelper::runExternal(busyboxPath, args, ui->currentDir, ui);
-    }, "busybox调用", "bb <命令>");
+        // 直接通过系统的工具执行
+        CommandHelper::runExternal(sysTool, args, ui->currentDir, ui);
+    }, "系统扩展调用", "bb <命令>");
 }
