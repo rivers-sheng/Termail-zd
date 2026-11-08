@@ -28,18 +28,7 @@ void CommandRegistry::registerProotCommands(TerminalWidget* ui) {
 
         ui->appendOutput("正在安装 PRoot 环境...\n", ACCENT_COLOR);
 
-        // 1. 检查 busybox 是否可用 (优先使用伪装成 so 的路径)
-        QString busyboxPath = QCoreApplication::applicationDirPath() + "/libbusybox.so";
-        if (!QFile::exists(busyboxPath)) {
-            // 兼容旧版本用户
-            busyboxPath = QDir(ui->currentDir).absoluteFilePath("busybox");
-            if (!QFile::exists(busyboxPath)) {
-                ui->appendOutput("未找到内置 busybox，请重新安装 APK\n", ERROR_COLOR);
-                return;
-            }
-        }
-
-        // 2. 复制 proot
+        // 1. 复制 proot
         QFile prootRes(":/resources/proot/proot");
         if (!prootRes.open(QIODevice::ReadOnly)) {
             ui->appendOutput("proot 资源未找到\n", ERROR_COLOR);
@@ -47,11 +36,6 @@ void CommandRegistry::registerProotCommands(TerminalWidget* ui) {
         }
         QByteArray prootData = prootRes.readAll();
         prootRes.close();
-
-        if (prootData.isEmpty()) {
-            ui->appendOutput("proot 资源为空\n", ERROR_COLOR);
-            return;
-        }
 
         QFile prootDest(prootPath);
         if (!prootDest.open(QIODevice::WriteOnly)) {
@@ -69,10 +53,9 @@ void CommandRegistry::registerProotCommands(TerminalWidget* ui) {
             QFile::remove(prootPath);
             return;
         }
-        ui->appendOutput(QString("proot 已复制 (%1 KB)\n")
-            .arg(prootData.size() / 1024), INFO_COLOR);
+        ui->appendOutput(QString("proot 已复制 (%1 KB)\n").arg(prootData.size() / 1024), INFO_COLOR);
 
-        // 3. 复制 Alpine rootfs
+        // 2. 复制 Alpine rootfs
         QDir().mkpath(baseDir);
         QString tarPath = baseDir + "/alpine.tar";
 
@@ -85,12 +68,6 @@ void CommandRegistry::registerProotCommands(TerminalWidget* ui) {
         QByteArray tarData = tarRes.readAll();
         tarRes.close();
 
-        if (tarData.isEmpty()) {
-            ui->appendOutput("Alpine rootfs 资源为空\n", ERROR_COLOR);
-            QFile::remove(prootPath);
-            return;
-        }
-
         QFile tarDest(tarPath);
         if (!tarDest.open(QIODevice::WriteOnly)) {
             ui->appendOutput("无法写入压缩包\n", ERROR_COLOR);
@@ -99,17 +76,43 @@ void CommandRegistry::registerProotCommands(TerminalWidget* ui) {
         }
         tarDest.write(tarData);
         tarDest.close();
-        ui->appendOutput(QString("rootfs 已复制 (%1 KB)\n")
-            .arg(tarData.size() / 1024), INFO_COLOR);
+        ui->appendOutput(QString("rootfs 已复制 (%1 KB)\n").arg(tarData.size() / 1024), INFO_COLOR);
 
-        // 4. 解压 (注意：去掉了 -z 参数，防止不是 gzip 导致解压失败)
+        // 3. 解压 (动态检测系统工具)
         QDir().mkpath(rootfsPath);
         ui->appendOutput("解压中...\n", ACCENT_COLOR);
 
         QProcess tarProc;
         tarProc.setWorkingDirectory(baseDir);
-        // 尝试使用系统自带的 tar (如果有) 或者是 busybox 的 tar
-        tarProc.start(busyboxPath, QStringList() << "tar" << "-xf" << tarPath << "-C" << rootfsPath);
+        
+        QString tool;
+        QStringList tarArgs;
+
+        // 优先级 1: 独立的 tar
+        if (QFile::exists("/system/bin/tar")) {
+            tool = "/system/bin/tar";
+            tarArgs << "-xf" << tarPath << "-C" << rootfsPath;
+        } 
+        // 优先级 2: 使用 toybox tar
+        else if (QFile::exists("/system/bin/toybox")) {
+            tool = "/system/bin/toybox";
+            tarArgs << "tar" << "-xf" << tarPath << "-C" << rootfsPath;
+        } 
+        // 优先级 3: 使用 busybox tar
+        else if (QFile::exists("/system/bin/busybox")) {
+            tool = "/system/bin/busybox";
+            tarArgs << "tar" << "-xf" << tarPath << "-C" << rootfsPath;
+        }
+
+        if (tool.isEmpty()) {
+            ui->appendOutput("解压失败: 系统缺少 tar, toybox 或 busybox。\n", ERROR_COLOR);
+            QFile::remove(tarPath);
+            QFile::remove(prootPath);
+            return;
+        }
+
+        ui->appendOutput(QString("使用系统工具: %1\n").arg(tool), INFO_COLOR);
+        tarProc.start(tool, tarArgs);
 
         if (!tarProc.waitForStarted(5000)) {
             ui->appendOutput("无法启动解压进程\n", ERROR_COLOR);
@@ -130,14 +133,15 @@ void CommandRegistry::registerProotCommands(TerminalWidget* ui) {
 
         QFile::remove(tarPath);
 
-        // 5. 验证解压结果 (检查是否有 /bin/sh)
-        if (QFile::exists(rootfsPath + "/bin/sh")) {
+        // 4. 验证解压结果
+        QFileInfo shInfo(rootfsPath + "/bin/sh");
+        if (shInfo.exists() || shInfo.isSymLink() || QFile::exists(rootfsPath + "/bin")) {
             ui->appendOutput("PRoot 环境安装完成！\n", PROMPT_COLOR);
             ui->appendOutput(QString("位置: %1\n").arg(rootfsPath));
             ui->appendOutput("输入 proot-mirror 切换国内镜像\n", INFO_COLOR);
             ui->appendOutput("输入 proot-install gcc 安装编译器\n", INFO_COLOR);
         } else {
-            ui->appendOutput("解压失败 (未找到 /bin/sh)，已回滚\n", ERROR_COLOR);
+            ui->appendOutput("解压失败，未找到 /bin 目录，已回滚\n", ERROR_COLOR);
             QDir(rootfsPath).removeRecursively();
             QFile::remove(prootPath);
         }
@@ -158,7 +162,7 @@ void CommandRegistry::registerProotCommands(TerminalWidget* ui) {
             ui->appendOutput("proot 未找到，请运行 proot-setup\n", ERROR_COLOR);
             return;
         }
-        if (!QFile::exists(rootfsPath + "/bin/sh")) {
+        if (!QFile::exists(rootfsPath + "/bin")) {
             ui->appendOutput("rootfs 未找到，请运行 proot-setup\n", ERROR_COLOR);
             return;
         }
@@ -333,7 +337,6 @@ void CommandRegistry::registerProotCommands(TerminalWidget* ui) {
 ═══════════════════════════════════════
 
 【PRoot 环境】
-  get-busybox          安装 busybox（必须）
   proot-setup          安装 PRoot + Alpine（必须）
   proot-mirror         切换国内镜像（必须）
   set-dns <IP>         设置DNS（推荐119.29.29.29）
@@ -366,7 +369,7 @@ void CommandRegistry::registerProotCommands(TerminalWidget* ui) {
 【日志】
   log                  系统日志
   log-termail          程序日志
-  exit-log             关闭日志
+  /exit-log             关闭日志
 
 【设置】
   setfont <8-32>       设置字号
@@ -375,12 +378,11 @@ void CommandRegistry::registerProotCommands(TerminalWidget* ui) {
 
 ═══════════════════════════════════════
   完整安装顺序:
-  1. get-busybox
-  2. proot-setup
-  3. proot-mirror
-  4. set-dns 119.29.29.29
-  5. proot-update
-  6. proot-install gcc
+  1. proot-setup
+  2. proot-mirror
+  3. set-dns 119.29.29.29
+  4. proot-update
+  5. proot-install gcc
 ═══════════════════════════════════════
 )";
         ui->appendOutput(output, ACCENT_COLOR);
