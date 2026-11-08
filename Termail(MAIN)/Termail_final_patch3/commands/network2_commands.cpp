@@ -740,7 +740,11 @@ static void handleRequest(QTcpSocket* client, const QString& request, TerminalWi
         if (info.size() > 1024 * 1024) { sendResponse(client, 200, "text/plain; charset=utf-8", "文件过大，无法预览（>1MB）"); return; }
         QFile f(full);
         if (!f.open(QIODevice::ReadOnly)) { sendResponse(client, 500, "text/plain", "读取失败"); return; }
-        QString content = QString::fromUtf8(f.readAll());
+        QByteArray fileData = f.readAll();
+        QString content = QString::fromUtf8(fileData);
+        if (content.contains(QChar(0xFFFD))) {
+            content = QString::fromLocal8Bit(fileData);
+        }
         f.close();
         sendResponse(client, 200, "text/html; charset=utf-8", viewPage(username, rel.mid(1), content, isRoot, canW).toUtf8());
         return;
