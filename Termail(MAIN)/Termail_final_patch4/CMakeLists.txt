@@ -1,0 +1,77 @@
+cmake_minimum_required(VERSION 3.16)
+project(Termail VERSION 6.6.0 LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_AUTOMOC ON)
+
+find_package(Qt6 REQUIRED COMPONENTS Widgets Core Gui Network)
+
+add_subdirectory(lua)
+
+set(SOURCES
+    main.cpp
+    terminal/terminal.cpp
+    commands/commands.cpp
+    commands/file_commands.cpp
+    commands/network_commands.cpp
+    commands/system_commands.cpp
+    commands/text_commands.cpp
+    commands/fun_commands.cpp
+    commands/cmenu.cpp
+    commands/many_extra.cpp
+    commands/log_commands.cpp
+    commands/session_commands.cpp
+    commands/network2_commands.cpp
+    commands/ssh_commands.cpp
+    commands/about_commands.cpp
+    commands/config_commands.cpp
+    commands/enhanced_commands.cpp
+    commands/notify_commands.cpp
+    editor/editor_dialog.cpp
+    editor/editor_commands.cpp
+    lua/lua_engine.cpp
+    commands/lua_commands.cpp
+    utils/utils.cpp
+)
+
+set(HEADERS
+    config.h
+    terminal/terminal.h
+    commands/commands.h
+    editor/editor_dialog.h
+    lua/lua_engine.h
+    utils/utils.h
+)
+
+qt_add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
+
+qt_add_resources(${PROJECT_NAME} "termail_resources"
+    PREFIX "/"
+    FILES
+        resources/custom_commands.json
+        LICENSE/GPL.txt
+)
+
+target_include_directories(${PROJECT_NAME} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/terminal
+    ${CMAKE_CURRENT_SOURCE_DIR}/commands
+    ${CMAKE_CURRENT_SOURCE_DIR}/editor
+    ${CMAKE_CURRENT_SOURCE_DIR}/lua
+    ${CMAKE_CURRENT_SOURCE_DIR}/utils
+)
+
+target_link_libraries(${PROJECT_NAME} PRIVATE
+    Qt6::Widgets Qt6::Core Qt6::Gui Qt6::Network
+    lua
+)
+
+if(ANDROID)
+    set_target_properties(${PROJECT_NAME} PROPERTIES
+        QT_ANDROID_APP_NAME "Termail"
+        QT_ANDROID_PACKAGE_NAME "com.termail.terminal"
+        QT_ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/android"
+    )
+
+endif()
