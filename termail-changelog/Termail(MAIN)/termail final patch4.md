@@ -2,39 +2,51 @@
 
 ## 更新
 - 版本号从 6.5.1 升级至 6.6.0，`CMakeLists`、`config.h`、`main.cpp` 中的应用版本号同步更新
-- **移除语言国际化系统**：彻底移除 `lang.h` / `lang.cpp` 及 `lang_dict.json` 相关逻辑，回归纯中文界面，提升终端输出性能，避免中英混搭乱码
-- **废弃 PRoot 容器**：彻底移除 proot 相关资源与代码，移除对内置 busybox 的依赖，有效减小 APK 体积
-- **系统底层调用重构**：`bb` 命令改为直接调用系统 `toybox`，并在调用失败时给出明确提示；`proot-setup` 和 `proot-shell` 被彻底移除
-- **命令分类与优化**：
-  - `help` 命令拆分为“核心命令”与“外部组件命令”两部分展示，界面大幅精简
-  - 新增 `more` 命令，用于查看 300+ 个依赖外部环境的高级扩展命令（如 `gcc`、`python`、`ssh` 等）
-  - 核心命令列表 (`getCoreBuiltins`) 提取为全局函数，消除代码重复
-- **HTTP 服务器大幅增强**：
-  - **全新运行器**：新增 `/run` 路由，支持在浏览器直接运行 HTML 文件，严格受权限限制（非 `root` 且无 `X` 权限时拒绝运行）
-  - **重命名与移动**：新增文件重命名（`/rename`）和跨目录移动（`/move`）功能
-  - **媒体预览**：新增 `/raw` 路由，支持图片（jpg/png/gif/webp）及视频（mp4）的在线预览与播放
-  - **静默刷新**：移除 `<meta refresh>` 强制整页刷新，改为前端 JS 定时请求 `/api/online_count`，实现无感实时在线人数更新
-  - **日志持久化**：所有 HTTP 请求实时写入 `serve-log/YYYY-MM-DD.log`，并记录 IP 与用户信息
-  - **IP 黑名单**：新增 `/admin/blacklist` 功能，支持在控制台封禁/解封 IP
-  - **控制台重构**：新增返回按钮，拆分在线状态、黑名单、日志查看、账户管理四大模块；支持独立修改 Root 密码
-- **文件操作**：
-  - **Root 权限删除**：`rm` / `rmdir` 改为通过 `su -c` 执行，实现真正的底层强制删除
-  - **取消系统保护拦截**：彻底移除 `isSystemProtectedPath` 拦截，遵循“Linux 极客精神”，交由用户自行确认
-- **构建环境适配**：移除对 `libbusybox.so` 的打包与编译配置，APK 不再包含冗余的底层二进制文件
+- **核心底层重构：彻底移除 PRoot 与内置 busybox**
+  - 移除 `proot_commands.cpp` 及相关资源，彻底摆脱 Android 10+ 的 `noexec` 限制与 SELinux 困扰
+  - `busybox` 改为直接调用系统底层 `toybox`，`get-busybox` 改为提示无需安装
+- **新增自检系统与白名单动态分类**
+  - 启动时在状态栏显示进度，并异步检测系统的底层命令兼容性
+  - 将纯 C++ 内置命令与系统确定的命令（如 `ping`、`vi`、`tee`）直接写入安全白名单（免测）
+  - 不再依赖 `QProcess` 强制测试带参命令（如 `ping`），彻底杜绝误杀
+  - 通过底层物理路径探测 (`access`) 快速识别外部命令，保证 UI 绝不卡死
+- **`help` 与 `more` 命令全面重写**
+  - `help` 命令现在只展示 242 个“核心命令”列表，并支持 `help <命令名>` 查询用法及模糊筛选
+  - 新增 `more` 命令，专门展示 118 个“外部组件命令”（如 `gcc`、`python`、`ssh` 等），支持关键词筛选
+  - 废弃硬编码的 `helpMap`，改为从注册表动态读取 `desc` 与 `usage`
+- **无参提示全面补全**
+  - 修复了所有“无参数时静默失败”的命令（如 `rev`、`join`、`tee`、`yum` 等），全都会输出 `用法: xxx` 提示
+- **HTTP 服务器（`serve`）深度优化**
+  - 界面 UI 彻底丝滑：引入 CSS 动画、悬浮卡片、Toast 提示
+  - 新增“运行器”功能：可通过网页直接运行 HTML 文件（严格受 `X` 权限控制）
+  - 新增“重命名”、“移动”文件功能，修复了上传文件至子目录的错误
+  - 新增日志持久化：所有请求实时写入 `serve-log/YYYY-MM-DD.log`
+  - 新增实时在线状态、IP 黑名单、隐藏上传进度条
+  - 重构控制台页面，新增返回按钮，修复 Root 改密死循环 Bug
+  - 密码文件（`http_users.json`）加入严格黑名单，非 root 用户绝对无法读写
+- **编辑器 UI 修复**
+  - 顶部工具栏改回 `QGridLayout` 自适应布局，解决移动端按钮溢出问题
+  - 真正实装了左侧行号栏，并与主编辑区滚动同步
+- **文件操作调整**
+  - `rm` / `rmdir` 改为底层 `su -c` 执行真实删除，防止假删除
+  - 移除针对根目录及系统目录的硬性拦截，交由用户自行确认（符合 Linux 极客精神）
+- **底层防崩溃修复**
+  - 重构 `runExternal` 的 `QProcess` 生命周期管理，彻底修复 `ping` 后点 `stop` 引起的 `Scudo` 内存崩溃
+  - 修复 `confirm` 高危命令确认的死循环
 
 ## 新增
-- 新增 `more` 命令，用于查看外部扩展命令列表
-- 新增 `lang` 命令（已废弃）及对应的中英字典加载机制
-- `about` 命令更新版本号及开源协议信息
-- `changelog` 命令更新指向地址
-- HTTP 后台新增 `/run`、`/raw`、`/rename`、`/move`、`/api/online_count` 路由
-- HTTP 控制台新增 IP 黑名单输入框及日志查看日期选择框
+- 新增 `utils/selfcheck.h`，用于底层命令的自检与白名单写入
+- 新增 `more` 命令，用于查看 118 个外部组件命令
+- 新增 `catmore` 命令，用于替代原本的 `more` 文件查看功能（原 `more` 命令已被重构为扩展列表）
+- HTTP 服务器新增 `/run`、`/raw`、`/rename`、`/move`、`/api/online_count` 路由
+- HTTP 控制台新增 IP 黑名单、日志查看、用户管理快捷操作面板
+- 编辑器新增 `QPlainTextEdit` 行号栏及同步滚动
 
 ## 删除
-- 移除 `utils/lang.cpp` 与 `utils/lang.h`
-- 移除 `resources/lang_dict.json` 资源打包
-- 移除 `resources/busybox/busybox`、`resources/proot/proot`、`resources/proot/alpine.tar` 等资源
-- 移除 CMake 中 Android 平台对 `libbusybox.so` 的 `POST_BUILD` 复制逻辑
-- 移除 `commands.h` 及 `commands.cpp` 中与 PRoot / Many1~4 / Lang 相关的函数声明与调用
-- 移除 `terminal.cpp` 及 `main.cpp` 中对 `g_isEnglish` 及 `loadLanguageDict` 的引用
-- 移除 `system_commands.cpp` 中多余的组件检测与 `lang` 命令
+- 移除 `commands/proot_commands.cpp`
+- 移除 `resources/busybox/busybox`、`resources/proot/proot`、`resources/proot/alpine.tar`
+- 移除 `utils/lang.cpp` 与 `utils/lang.h`（废弃国际化支持）
+- 移除 CMake 中 Android 平台对 `libbusybox.so` 及 `proot` 的 `POST_BUILD` 拷贝逻辑
+- 移除 `terminal.h` 及 `terminal.cpp` 中的跨线程 `QProcess` 异步检测逻辑
+- 移除 `system_commands.cpp` 中大量硬编码的 `helpMap`
+- 移除 `many1.cpp` 至 `many4.cpp`，合并至 `many_extra.cpp`
