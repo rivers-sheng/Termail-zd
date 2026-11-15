@@ -1,6 +1,7 @@
 #include "terminal.h"
 #include "utils/utils.h"
 #include "commands/commands.h"
+#include "utils/selfcheck.h" // 必须引入
 
 #include <QApplication>
 #include <QScrollBar>
@@ -12,6 +13,9 @@
 #include <QTimer>
 #include <QFileInfo>
 #include <QStorageInfo>
+#include <QFile>
+#include <QTextStream>
+#include <QThread>
 #ifdef Q_OS_ANDROID
 #include <QJniObject>
 #endif
@@ -19,7 +23,7 @@
 TerminalWidget::TerminalWidget(QWidget* parent)
     : QWidget(parent), historyIndex(0), currentProcess(nullptr),
       tabMatchIndex(0), interactiveMode(false), interactiveProcess(nullptr),
-      currentSessionId(1), nextSessionId(2) {
+      currentSessionId(1), nextSessionId(2), m_cmdIndex(0) {
 
     currentDir = QDir::currentPath();
 #ifdef Q_OS_WIN
@@ -49,6 +53,9 @@ TerminalWidget::TerminalWidget(QWidget* parent)
     setupShortcuts();
     displayWelcome();
     loadFontSettings();
+
+    // 启动后台自检（状态栏进度条）
+    startSelfCheck();
 }
 
 TerminalWidget::~TerminalWidget() {
@@ -141,6 +148,61 @@ void TerminalWidget::updateStatusBar() {
 
     statusLabel->setText(QString(" %1  |  %2  |  %3")
         .arg(dir, memInfo, sessionInfo));
+}
+
+void TerminalWidget::startSelfCheck() {
+    QString checkPath = selfCheckFilePath();
+    QString dirPath = QFileInfo(checkPath).absolutePath();
+    QDir().mkpath(dirPath);
+
+    bool needCheck = true;
+    if (QFile::exists(checkPath)) {
+        QFile f(checkPath);
+        if (f.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            if (f.readAll().contains("[Available]")) needCheck = false;
+            f.close();
+        }
+    }
+
+    if (!needCheck) return;
+
+    m_availableCmds = getSafeBuiltins();
+    m_cmdList = getExternalCommandsToTest();
+    m_cmdIndex = 0;
+
+    if (statusTimer) statusTimer->stop(); // 暂停磁盘状态刷新
+    statusLabel->setText(QString("正在自检底层命令: [0/%1]").arg(m_cmdList.size()));
+
+    runNextCheck();
+}
+
+void TerminalWidget::runNextCheck() {
+    if (m_cmdIndex >= m_cmdList.size()) {
+        // 自检完成，写入本地文件
+        QFile checkFile(selfCheckFilePath());
+        if (checkFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            QTextStream out(&checkFile);
+            out << "[Available]\n" << m_availableCmds.join("\n") << "\n\n[Missing]\n";
+            checkFile.close();
+        }
+
+        statusLabel->setText("✅ 命令自检完成");
+        QTimer::singleShot(3000, [this]() {
+            if (statusTimer) statusTimer->start(2000);
+            updateStatusBar();
+        });
+        return;
+    }
+
+    QString cmd = m_cmdList[m_cmdIndex];
+    if (checkCmdExists(cmd)) {
+        m_availableCmds.append(cmd);
+    }
+    m_cmdIndex++;
+    statusLabel->setText(QString("正在自检底层命令: [%1/%2]").arg(m_cmdIndex).arg(m_cmdList.size()));
+    
+    // 异步下一个，UI 绝对不卡
+    QTimer::singleShot(10, this, &TerminalWidget::runNextCheck);
 }
 
 void TerminalWidget::setupShortcuts() {
@@ -343,12 +405,11 @@ void TerminalWidget::executeInternalCommand(const QString& commandLine, int dept
         return;
     }
 
-    // === 绝对防死循环 ===
     if (commandLine.trimmed() == "confirm") {
         if (!pendingCommand.isEmpty()) {
             QString cmdToRun = pendingCommand;
-            pendingCommand.clear(); // 必须立刻清空
-            executeInternalCommand(cmdToRun, depth + 1); // 再次执行
+            pendingCommand.clear();
+            executeInternalCommand(cmdToRun, depth + 1);
             return;
         } else {
             appendOutput("没有待确认的高危命令\n", ERROR_COLOR);
@@ -356,7 +417,6 @@ void TerminalWidget::executeInternalCommand(const QString& commandLine, int dept
         }
     }
 
-    // 高危命令确认
     QStringList dangerous = {
         "rm -rf", "rm -fr", "dd if=", "dd of=", "mkfs", "fdisk",
         "shred", "poweroff", "reboot", "shutdown", "halt",
@@ -364,10 +424,7 @@ void TerminalWidget::executeInternalCommand(const QString& commandLine, int dept
     };
     for (const QString& d : dangerous) {
         if (commandLine.startsWith(d)) {
-            // 注意看这里：如果当前命令就是 pendingCommand，说明是被 confirm 唤醒的，直接放行
-            if (commandLine == pendingCommand) {
-                break; 
-            }
+            if (commandLine == pendingCommand) break; 
             appendOutput(QString("高危命令: %1\n").arg(commandLine), ERROR_COLOR);
             appendOutput("输入 confirm 执行\n", ERROR_COLOR);
             pendingCommand = commandLine;

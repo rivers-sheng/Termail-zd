@@ -14,11 +14,11 @@
 #include <QSettings>
 #include <QAction>
 #include <QTimer>
+#include <QProgressBar>
 
 #include "config.h"
 #include "commands/commands.h"
 
-// 会话结构
 struct Session {
     int id;
     QString name;
@@ -37,7 +37,6 @@ public:
     explicit TerminalWidget(QWidget* parent = nullptr);
     ~TerminalWidget();
 
-    // 当前会话（兼容旧代码）
     QString currentDir;
     QString username;
     QString hostname;
@@ -48,10 +47,9 @@ public:
     QTextEdit* outputArea;
     QLineEdit* inputField;
     QLabel* promptLabel;
-    QLabel* statusLabel;    // 状态栏
+    QLabel* statusLabel;
     QString pendingCommand;
 
-    // 多会话
     QMap<int, Session> sessions;
     int currentSessionId;
     int nextSessionId;
@@ -66,7 +64,6 @@ public:
     void loadAliases();
     QStringList getHistory() const;
 
-    // 会话管理
     void createSession(const QString& name = "");
     void switchSession(int id);
     void killSession(int id);
@@ -77,6 +74,7 @@ private slots:
     void onHistoryUp();
     void onHistoryDown();
     void onTabComplete();
+    void runNextCheck(); // 新增
 
 private:
     void setupUI();
@@ -95,6 +93,7 @@ private:
     void vibrate(int ms);
     void saveHistory();
     QString suggestCommand(const QString& cmd);
+    void startSelfCheck(); // 新增
 
     QStringList history;
     int historyIndex;
@@ -103,6 +102,11 @@ private:
     QProcess* interactiveProcess;
     QTimer* statusTimer;
     CommandRegistry* cmdRegistry;
+
+    // 自检相关变量声明
+    QStringList m_cmdList;
+    int m_cmdIndex;
+    QStringList m_availableCmds;
 };
 
 #endif

@@ -11,6 +11,7 @@
 #include <QRandomGenerator>
 #include <QThread>
 #include <QTimer>
+#include <QDateTime>
 #include <algorithm>
 #include <cmath>
 #include <random>
@@ -18,7 +19,7 @@
 void CommandRegistry::registerTextCommands(TerminalWidget* ui) {
 
     registerCommand("tr", [ui](const QStringList& args) {
-        if (args.size() < 2) return;
+        if (args.size() < 2) { ui->appendOutput("用法: tr <字符集1> <字符集2> [文本]\n", ERROR_COLOR); return; }
         QString text = args.mid(2).join(' ');
         QString result;
         for (const QChar& ch : text) {
@@ -26,16 +27,17 @@ void CommandRegistry::registerTextCommands(TerminalWidget* ui) {
             result += (idx >= 0 && idx < args[1].size()) ? args[1][idx] : ch;
         }
         ui->appendOutput(result + "\n");
-    }, "字符替换", "tr");
+    }, "字符替换", "tr <字符集1> <字符集2> [文本]");
 
     registerCommand("rev", [ui](const QStringList& args) {
+        if (args.isEmpty()) { ui->appendOutput("用法: rev <文本>\n", ERROR_COLOR); return; }
         QString text = args.join(' ');
         std::reverse(text.begin(), text.end());
         ui->appendOutput(text + "\n");
-    }, "反转文本", "rev");
+    }, "反转文本", "rev <文本>");
 
     registerCommand("tac", [ui](const QStringList& args) {
-        if (args.isEmpty()) return;
+        if (args.isEmpty()) { ui->appendOutput("用法: tac <文件>\n", ERROR_COLOR); return; }
         QFile file(QDir(ui->currentDir).absoluteFilePath(args[0]));
         if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
             QStringList lines = QString(file.readAll()).split('\n');
@@ -43,11 +45,13 @@ void CommandRegistry::registerTextCommands(TerminalWidget* ui) {
             std::reverse(lines.begin(), lines.end());
             for (const QString& l : lines)
                 if (!l.isEmpty()) ui->appendOutput(l + "\n");
+        } else {
+            ui->appendOutput("文件不存在\n", ERROR_COLOR);
         }
-    }, "反向显示", "tac");
+    }, "反向显示文件", "tac <文件>");
 
     registerCommand("nl", [ui](const QStringList& args) {
-        if (args.isEmpty()) return;
+        if (args.isEmpty()) { ui->appendOutput("用法: nl <文件>\n", ERROR_COLOR); return; }
         QFile file(QDir(ui->currentDir).absoluteFilePath(args[0]));
         if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
             QTextStream in(&file);
@@ -55,11 +59,13 @@ void CommandRegistry::registerTextCommands(TerminalWidget* ui) {
             while (!in.atEnd())
                 ui->appendOutput(QString("%1\t%2\n").arg(n++, 6).arg(in.readLine()));
             file.close();
+        } else {
+            ui->appendOutput("文件不存在\n", ERROR_COLOR);
         }
-    }, "行号显示", "nl");
+    }, "行号显示文件", "nl <文件>");
 
     registerCommand("paste", [ui](const QStringList& args) {
-        if (args.size() < 2) return;
+        if (args.size() < 2) { ui->appendOutput("用法: paste <文件1> <文件2>\n", ERROR_COLOR); return; }
         QFile f1(QDir(ui->currentDir).absoluteFilePath(args[0]));
         QFile f2(QDir(ui->currentDir).absoluteFilePath(args[1]));
         if (f1.open(QIODevice::ReadOnly) && f2.open(QIODevice::ReadOnly)) {
@@ -69,13 +75,13 @@ void CommandRegistry::registerTextCommands(TerminalWidget* ui) {
                 ui->appendOutput(QString("%1\t%2\n")
                     .arg(i < l1.size() ? l1[i] : "", i < l2.size() ? l2[i] : ""));
         }
-    }, "合并文件", "paste");
+    }, "横向合并文件", "paste <文件1> <文件2>");
 
     registerCommand("split", [ui](const QStringList& args) {
-        if (args.isEmpty()) return;
+        if (args.isEmpty()) { ui->appendOutput("用法: split [-l 行数] <文件>\n", ERROR_COLOR); return; }
         int n = 1000, idx = 0;
         if (args[0] == "-l" && args.size() > 1) { n = args[1].toInt(); idx = 2; }
-        if (idx >= args.size()) return;
+        if (idx >= args.size()) { ui->appendOutput("用法: split [-l 行数] <文件>\n", ERROR_COLOR); return; }
         QFile file(QDir(ui->currentDir).absoluteFilePath(args[idx]));
         if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
             QStringList lines = QString(file.readAll()).split('\n');
@@ -89,21 +95,26 @@ void CommandRegistry::registerTextCommands(TerminalWidget* ui) {
                     out.close();
                 }
             }
+        } else {
+            ui->appendOutput("文件不存在\n", ERROR_COLOR);
         }
-    }, "分割文件", "split");
+    }, "分割文件", "split [-l 行数] <文件>");
 
     registerCommand("join", [ui](const QStringList& args) {
+        if (args.isEmpty()) { ui->appendOutput("用法: join <文件1> [文件2] ...\n", ERROR_COLOR); return; }
         for (const QString& fn : args) {
             QFile file(QDir(ui->currentDir).absoluteFilePath(fn));
             if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
                 ui->appendOutput(file.readAll());
                 file.close();
+            } else {
+                ui->appendOutput(QString("文件不存在: %1\n").arg(fn), ERROR_COLOR);
             }
         }
-    }, "连接文件", "join");
+    }, "连接文件", "join <文件1> [文件2] ...");
 
     registerCommand("fmt", [ui](const QStringList& args) {
-        if (args.isEmpty()) return;
+        if (args.isEmpty()) { ui->appendOutput("用法: fmt <文件>\n", ERROR_COLOR); return; }
         QFile file(QDir(ui->currentDir).absoluteFilePath(args[0]));
         if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
             QStringList words = QString(file.readAll()).split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
@@ -117,11 +128,13 @@ void CommandRegistry::registerTextCommands(TerminalWidget* ui) {
                 line += w + " ";
             }
             if (!line.isEmpty()) ui->appendOutput(line.trimmed() + "\n");
+        } else {
+            ui->appendOutput("文件不存在\n", ERROR_COLOR);
         }
-    }, "格式化", "fmt");
+    }, "文本格式化", "fmt <文件>");
 
     registerCommand("sed", [ui](const QStringList& args) {
-        if (args.size() < 2) return;
+        if (args.size() < 2) { ui->appendOutput("用法: sed s/原词/新词/ <文件>\n", ERROR_COLOR); return; }
         QString pattern = args[0];
         if (pattern.startsWith("s/") && pattern.endsWith("/")) {
             QString inner = pattern.mid(2, pattern.size() - 3);
@@ -133,65 +146,71 @@ void CommandRegistry::registerTextCommands(TerminalWidget* ui) {
                     file.close();
                     content.replace(QRegularExpression(inner.left(sep)), inner.mid(sep + 1));
                     ui->appendOutput(content);
+                } else {
+                    ui->appendOutput("文件不存在\n", ERROR_COLOR);
                 }
             }
         }
-    }, "流编辑器", "sed");
+    }, "流编辑器", "sed s/原词/新词/ <文件>");
 
     registerCommand("zip", [ui](const QStringList& args) {
+        if (args.isEmpty()) { ui->appendOutput("用法: zip <压缩包名.zip> <文件>\n", ERROR_COLOR); return; }
         CommandHelper::runExternal("zip", args, ui->currentDir, ui);
-    }, "压缩", "zip");
+    }, "压缩文件", "zip <压缩包名.zip> <文件>");
 
     registerCommand("unzip", [ui](const QStringList& args) {
+        if (args.isEmpty()) { ui->appendOutput("用法: unzip <压缩包名.zip>\n", ERROR_COLOR); return; }
         CommandHelper::runExternal("unzip", args, ui->currentDir, ui);
-    }, "解压", "unzip");
+    }, "解压文件", "unzip <压缩包名.zip>");
 
     registerCommand("tar", [ui](const QStringList& args) {
+        if (args.isEmpty()) { ui->appendOutput("用法: tar <参数>\n", ERROR_COLOR); return; }
         CommandHelper::runExternal("tar", args, ui->currentDir, ui);
-    }, "归档", "tar");
+    }, "归档工具", "tar <参数>");
 
     registerCommand("hash", [ui](const QStringList& args) {
-        if (args.isEmpty()) return;
+        if (args.isEmpty()) { ui->appendOutput("用法: hash <文本>\n", ERROR_COLOR); return; }
         QByteArray data = args.join(' ').toUtf8();
         ui->appendOutput(QString("MD5: %1\n").arg(QCryptographicHash::hash(data, QCryptographicHash::Md5).toHex()));
         ui->appendOutput(QString("SHA256: %1\n").arg(QCryptographicHash::hash(data, QCryptographicHash::Sha256).toHex()));
-    }, "哈希", "hash");
+    }, "文本哈希", "hash <文本>");
 
     registerCommand("base64", [ui](const QStringList& args) {
-        if (!args.isEmpty())
-            ui->appendOutput(args.join(' ').toUtf8().toBase64() + "\n");
-    }, "Base64", "base64");
+        if (args.isEmpty()) { ui->appendOutput("用法: base64 <文本>\n", ERROR_COLOR); return; }
+        ui->appendOutput(args.join(' ').toUtf8().toBase64() + "\n");
+    }, "Base64编码", "base64 <文本>");
 
     registerCommand("uuid", [ui](const QStringList&) {
         ui->appendOutput(QUuid::createUuid().toString(QUuid::WithoutBraces) + "\n");
-    }, "UUID", "uuid");
+    }, "生成UUID", "uuid");
 
     registerCommand("random", [ui](const QStringList& args) {
-        if (args.isEmpty())
+        if (args.isEmpty()) {
             ui->appendOutput(QString::number(QRandomGenerator::global()->generateDouble()) + "\n");
-        else if (args.size() == 1)
+        } else if (args.size() == 1) {
             ui->appendOutput(QString::number(QRandomGenerator::global()->bounded(args[0].toInt() + 1)) + "\n");
-        else
+        } else {
             ui->appendOutput(QString::number(QRandomGenerator::global()->bounded(args[0].toInt(), args[1].toInt() + 1)) + "\n");
-    }, "随机数", "random");
+        }
+    }, "生成随机数", "random [最小值] [最大值]");
 
     registerCommand("sleep", [ui](const QStringList& args) {
-        if (!args.isEmpty())
-            QThread::msleep(static_cast<unsigned long>(args[0].toDouble() * 1000));
-    }, "延时", "sleep");
+        if (args.isEmpty()) { ui->appendOutput("用法: sleep <秒数>\n", ERROR_COLOR); return; }
+        QThread::msleep(static_cast<unsigned long>(args[0].toDouble() * 1000));
+    }, "延时", "sleep <秒数>");
 
     registerCommand("watch", [ui](const QStringList& args) {
-        if (args.isEmpty()) return;
+        if (args.isEmpty()) { ui->appendOutput("用法: watch <命令>\n", ERROR_COLOR); return; }
         QString cmd = args.join(' ');
         for (int i = 0; i < 3; ++i) {
             QThread::sleep(2);
             ui->appendOutput(QString("\n--- %1 ---\n").arg(QDateTime::currentDateTime().toString("hh:mm:ss")));
             ui->executeInternalCommand(cmd);
         }
-    }, "重复执行", "watch");
+    }, "重复执行命令", "watch <命令>");
 
     registerCommand("tee", [ui](const QStringList& args) {
-        if (args.isEmpty()) return;
+        if (args.isEmpty()) { ui->appendOutput("用法: tee <文本> <输出文件>\n", ERROR_COLOR); return; }
         QString fn = args.last();
         QString text = args.mid(0, args.size() - 1).join(' ');
         QFile file(QDir(ui->currentDir).absoluteFilePath(fn));
@@ -200,16 +219,17 @@ void CommandRegistry::registerTextCommands(TerminalWidget* ui) {
             file.close();
         }
         ui->appendOutput(text + "\n");
-    }, "输出保存", "tee");
+    }, "输出并保存", "tee <文本> <输出文件>");
 
     registerCommand("yes", [ui](const QStringList& args) {
         QString text = args.isEmpty() ? "y" : args.join(' ');
         for (int i = 0; i < 10; ++i) ui->appendOutput(text + "\n");
-    }, "重复输出", "yes");
+    }, "重复输出", "yes [文本]");
 
     registerCommand("shuf", [ui](const QStringList& args) {
+        if (args.isEmpty()) { ui->appendOutput("用法: shuf <内容1> <内容2> ...\n", ERROR_COLOR); return; }
         QStringList shuffled = args;
         std::shuffle(shuffled.begin(), shuffled.end(), std::mt19937(QRandomGenerator::global()->generate()));
         for (const QString& s : shuffled) ui->appendOutput(s + "\n");
-    }, "随机排列", "shuf");
+    }, "随机打乱", "shuf <内容1> <内容2> ...");
 }

@@ -32,25 +32,8 @@
 #include <QTcpSocket>
 #include <QWidget>
 
-// ==========================================
-// 【雷霆检查】辅助函数：检查系统到底有没有这个二进制
-// ==========================================
-static bool checkSystemBinary(const QString& cmd, TerminalWidget* ui) {
-    QString path = QStandardPaths::findExecutable(cmd);
-    if (path.isEmpty()) {
-        ui->appendOutput(QString("[系统组件缺失] 您的设备未安装 '%1' 或该命令不属于系统核心白名单。\n").arg(cmd), ERROR_COLOR);
-        ui->appendOutput("提示: 依赖外部环境的命令需自行安装第三方工具包。\n", INFO_COLOR);
-        return false;
-    }
-    return true;
-}
-
 void CommandRegistry::registerManyExtraCommands(TerminalWidget* ui) {
 
-    // ==========================================
-    // 一、原 many4.cpp 中纯 C++ 手写的真·内置命令（必定能跑）
-    // ==========================================
-    
     registerCommand("open", [ui](const QStringList& args) {
         if (args.isEmpty()) { ui->appendOutput("用法: open <文件>\n", ERROR_COLOR); return; }
         QString path = QDir(ui->currentDir).absoluteFilePath(args[0]);
@@ -237,13 +220,11 @@ void CommandRegistry::registerManyExtraCommands(TerminalWidget* ui) {
     }, "CPU使用率", "watch-cpu");
 
     // ==========================================
-    // 二、需要系统外部组件的命令（雷霆检测版）
+    // 二、需要系统外部组件的命令（纯净直连版，交给底层的 sh 去跑）
     // ==========================================
-
-    // 辅助宏，用于快速生成带检测的外部命令（C++ 大法好）
     #define REG_EXT_CMD(cmd_name, desc) \
         registerCommand(cmd_name, [ui](const QStringList& a){ \
-            if (checkSystemBinary(cmd_name, ui)) CommandHelper::runExternal(cmd_name, a, ui->currentDir, ui); \
+            CommandHelper::runExternal(cmd_name, a, ui->currentDir, ui); \
         }, desc, cmd_name);
 
     // 开发工具

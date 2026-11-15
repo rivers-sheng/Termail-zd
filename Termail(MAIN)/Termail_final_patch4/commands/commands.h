@@ -21,7 +21,8 @@ public:
                          const QString& desc = "", const QString& usage = "");
     bool execute(const QString& name, const QStringList& args);
     QStringList getCommandNames() const;
-
+    QString getCommandDesc(const QString& name) const;
+    QString getCommandUsage(const QString& name) const;
     void registerAllBuiltins(TerminalWidget* ui);
 
 private:

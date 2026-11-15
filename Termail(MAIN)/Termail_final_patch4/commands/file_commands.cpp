@@ -21,8 +21,8 @@
 static bool hasRootAccess() {
     QProcess p;
     p.start("su", QStringList() << "-c" << "id");
-    if (!p.waitForStarted(1000)) return false; // su 没启动起来
-    if (!p.waitForFinished(1500)) { p.kill(); return false; } // su 超时(用户没点允许)
+    if (!p.waitForStarted(1000)) return false; 
+    if (!p.waitForFinished(1500)) { p.kill(); return false; }
     
     bool isRoot = QString(p.readAllStandardOutput()).contains("uid=0");
     p.kill();
@@ -36,7 +36,7 @@ static bool executeRealDelete(const QString& path, bool recursive) {
     
     p.start("su", QStringList() << "-c" << cmd);
     if (!p.waitForStarted(1000)) return false;
-    p.waitForFinished(3000); // 大文件删除给3秒超时
+    p.waitForFinished(3000); 
     return p.exitCode() == 0;
 }
 
@@ -99,7 +99,7 @@ void CommandRegistry::registerFileCommands(TerminalWidget* ui) {
     }, "当前目录", "pwd");
 
     registerCommand("mkdir", [ui](const QStringList& args) {
-        if (args.isEmpty()) return;
+        if (args.isEmpty()) { ui->appendOutput("用法: mkdir <目录>\n", ERROR_COLOR); return; }
         for (const QString& d : args) {
             if (QDir().mkpath(QDir(ui->currentDir).absoluteFilePath(d)))
                 ui->appendOutput(QString("创建: %1\n").arg(d), INFO_COLOR);
@@ -108,10 +108,10 @@ void CommandRegistry::registerFileCommands(TerminalWidget* ui) {
     }, "创建目录", "mkdir <目录>");
 
     registerCommand("rmdir", [ui](const QStringList& args) {
+        if (args.isEmpty()) { ui->appendOutput("用法: rmdir <目录>\n", ERROR_COLOR); return; }
         for (const QString& d : args) {
             QString path = QDir::cleanPath(QDir(ui->currentDir).absoluteFilePath(d));
             
-            // 彻底放开：直接用 su 执行 rmdir
             QProcess p;
             QString cmd = QString("rmdir \"%1\"").arg(path);
             p.start("su", QStringList() << "-c" << cmd);
@@ -137,15 +137,12 @@ void CommandRegistry::registerFileCommands(TerminalWidget* ui) {
         for (const QString& f : files) {
             QString path = QDir::cleanPath(QDir(ui->currentDir).absoluteFilePath(f));
             
-            // 彻底放开：用户想删根目录就删，GPL 不保修！(但做个友好的二次确认)
             if (path == "/" && recursive) {
                 ui->appendOutput("⚠️ 警告：您正在尝试递归删除根目录 '/'！\n", ERROR_COLOR);
                 ui->appendOutput("这将彻底摧毁系统。如果确定，请执行: rm -rf /*\n", INFO_COLOR);
-                // 这里只是提示，如果用户真的用 rm -rf /* 还是会继续执行
             }
 
             QFileInfo info(path);
-            // 这里去掉 isSystemProtectedPath 拦截，直接走真实删除
             if (executeRealDelete(path, recursive)) {
                 ui->appendOutput(QString("删除: %1\n").arg(f), INFO_COLOR);
             } else {
@@ -159,6 +156,7 @@ void CommandRegistry::registerFileCommands(TerminalWidget* ui) {
     }, "删除", "del");
 
     registerCommand("touch", [ui](const QStringList& args) {
+        if (args.isEmpty()) { ui->appendOutput("用法: touch <文件>\n", ERROR_COLOR); return; }
         for (const QString& f : args) {
             QFile file(QDir(ui->currentDir).absoluteFilePath(f));
             if (file.open(QIODevice::WriteOnly | QIODevice::Append)) file.close();
@@ -166,6 +164,7 @@ void CommandRegistry::registerFileCommands(TerminalWidget* ui) {
     }, "创建空文件", "touch <文件>");
 
     registerCommand("cat", [ui](const QStringList& args) {
+        if (args.isEmpty()) { ui->appendOutput("用法: cat <文件>\n", ERROR_COLOR); return; }
         for (const QString& f : args) {
             QFile file(QDir(ui->currentDir).absoluteFilePath(f));
             if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
@@ -190,32 +189,32 @@ void CommandRegistry::registerFileCommands(TerminalWidget* ui) {
     }, "查看文件", "type");
 
     registerCommand("cp", [ui](const QStringList& args) {
-        if (args.size() < 2) return;
+        if (args.size() < 2) { ui->appendOutput("用法: cp <源> <目标>\n", ERROR_COLOR); return; }
         QString src = QDir(ui->currentDir).absoluteFilePath(args[0]);
         QString dst = QDir(ui->currentDir).absoluteFilePath(args[1]);
         if (QFileInfo(src).isDir()) Utils::copyDir(src, dst);
         else QFile::copy(src, dst);
-    }, "复制", "cp");
+    }, "复制", "cp <源> <目标>");
 
     registerCommand("copy", [ui](const QStringList& args) {
         ui->executeInternalCommand("cp " + args.join(' '));
     }, "复制", "copy");
 
     registerCommand("mv", [ui](const QStringList& args) {
-        if (args.size() < 2) return;
+        if (args.size() < 2) { ui->appendOutput("用法: mv <源> <目标>\n", ERROR_COLOR); return; }
         QFile::rename(QDir(ui->currentDir).absoluteFilePath(args[0]),
                       QDir(ui->currentDir).absoluteFilePath(args[1]));
-    }, "移动", "mv");
+    }, "移动", "mv <源> <目标>");
 
     registerCommand("move", [ui](const QStringList& args) {
         ui->executeInternalCommand("mv " + args.join(' '));
     }, "移动", "move");
 
     registerCommand("rename", [ui](const QStringList& args) {
-        if (args.size() != 2) return;
+        if (args.size() != 2) { ui->appendOutput("用法: rename <旧名> <新名>\n", ERROR_COLOR); return; }
         QFile::rename(QDir(ui->currentDir).absoluteFilePath(args[0]),
                       QDir(ui->currentDir).absoluteFilePath(args[1]));
-    }, "重命名", "rename");
+    }, "重命名", "rename <旧名> <新名>");
 
     registerCommand("tree", [ui](const QStringList&) {
         std::function<void(const QString&, const QString&, int)> show =
@@ -256,7 +255,7 @@ void CommandRegistry::registerFileCommands(TerminalWidget* ui) {
     }, "查找文件", "find <关键词>");
 
     registerCommand("grep", [ui](const QStringList& args) {
-        if (args.size() < 2) return;
+        if (args.size() < 2) { ui->appendOutput("用法: grep <词> <文件>\n", ERROR_COLOR); return; }
         QFile file(QDir(ui->currentDir).absoluteFilePath(args[1]));
         if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
             QTextStream in(&file);
@@ -271,10 +270,10 @@ void CommandRegistry::registerFileCommands(TerminalWidget* ui) {
             }
             file.close();
         }
-    }, "搜索文本", "grep");
+    }, "搜索文本", "grep <词> <文件>");
 
     registerCommand("wc", [ui](const QStringList& args) {
-        if (args.isEmpty()) return;
+        if (args.isEmpty()) { ui->appendOutput("用法: wc <文件>\n", ERROR_COLOR); return; }
         QFile file(QDir(ui->currentDir).absoluteFilePath(args[0]));
         if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
             QString content = file.readAll();
@@ -283,7 +282,7 @@ void CommandRegistry::registerFileCommands(TerminalWidget* ui) {
             int words = content.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts).size();
             ui->appendOutput(QString("行:%1 词:%2 字符:%3\n").arg(lines).arg(words).arg(content.size()));
         }
-    }, "统计", "wc");
+    }, "统计", "wc <文件>");
 
     registerCommand("head", [ui](const QStringList& args) {
         int n = 10; QString fn;
@@ -291,14 +290,14 @@ void CommandRegistry::registerFileCommands(TerminalWidget* ui) {
             if (args[i] == "-n" && i + 1 < args.size()) n = args[++i].toInt();
             else fn = args[i];
         }
-        if (fn.isEmpty()) return;
+        if (fn.isEmpty()) { ui->appendOutput("用法: head [-n 行数] <文件>\n", ERROR_COLOR); return; }
         QFile file(QDir(ui->currentDir).absoluteFilePath(fn));
         if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
             QTextStream in(&file);
             for (int i = 0; i < n && !in.atEnd(); ++i) ui->appendOutput(in.readLine() + "\n");
             file.close();
         }
-    }, "前N行", "head");
+    }, "前N行", "head [-n 行数] <文件>");
 
     registerCommand("tail", [ui](const QStringList& args) {
         int n = 10; QString fn;
@@ -306,7 +305,7 @@ void CommandRegistry::registerFileCommands(TerminalWidget* ui) {
             if (args[i] == "-n" && i + 1 < args.size()) n = args[++i].toInt();
             else fn = args[i];
         }
-        if (fn.isEmpty()) return;
+        if (fn.isEmpty()) { ui->appendOutput("用法: tail [-n 行数] <文件>\n", ERROR_COLOR); return; }
         QFile file(QDir(ui->currentDir).absoluteFilePath(fn));
         if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
             QStringList lines = QString(file.readAll()).split('\n');
@@ -314,23 +313,26 @@ void CommandRegistry::registerFileCommands(TerminalWidget* ui) {
             for (int i = qMax(0, lines.size() - n); i < lines.size(); ++i)
                 ui->appendOutput(lines[i] + "\n");
         }
-    }, "后N行", "tail");
+    }, "后N行", "tail [-n 行数] <文件>");
 
-    registerCommand("more", [ui](const QStringList& args) {
-        if (args.isEmpty()) return;
+    registerCommand("catmore", [ui](const QStringList& args) {
+        if (args.isEmpty()) { ui->appendOutput("用法: catmore <文件>\n", ERROR_COLOR); return; }
         QFile file(QDir(ui->currentDir).absoluteFilePath(args[0]));
         if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
             ui->appendOutput(file.readAll());
             file.close();
+        } else {
+            ui->appendOutput(QString("文件不存在: %1\n").arg(args[0]), ERROR_COLOR);
         }
-    }, "分页查看", "more");
+    }, "分页查看", "catmore <文件>");
 
     registerCommand("less", [ui](const QStringList& args) {
-        ui->executeInternalCommand("more " + args.join(' '));
-    }, "分页查看", "less");
+        if (args.isEmpty()) { ui->appendOutput("用法: less <文件>\n", ERROR_COLOR); return; }
+        ui->executeInternalCommand("catmore " + args.join(' '));
+    }, "分页查看", "less <文件>");
 
     registerCommand("diff", [ui](const QStringList& args) {
-        if (args.size() != 2) return;
+        if (args.size() != 2) { ui->appendOutput("用法: diff <文件1> <文件2>\n", ERROR_COLOR); return; }
         QFile f1(QDir(ui->currentDir).absoluteFilePath(args[0]));
         QFile f2(QDir(ui->currentDir).absoluteFilePath(args[1]));
         if (f1.open(QIODevice::ReadOnly) && f2.open(QIODevice::ReadOnly)) {
@@ -345,10 +347,10 @@ void CommandRegistry::registerFileCommands(TerminalWidget* ui) {
                 }
             }
         }
-    }, "对比", "diff");
+    }, "对比", "diff <文件1> <文件2>");
 
     registerCommand("sort", [ui](const QStringList& args) {
-        if (args.isEmpty()) return;
+        if (args.isEmpty()) { ui->appendOutput("用法: sort [-r] <文件>\n", ERROR_COLOR); return; }
         QFile file(QDir(ui->currentDir).absoluteFilePath(args.last()));
         if (file.open(QIODevice::ReadOnly)) {
             QStringList lines = QString(file.readAll()).split('\n', Qt::SkipEmptyParts);
@@ -357,10 +359,10 @@ void CommandRegistry::registerFileCommands(TerminalWidget* ui) {
             if (args.contains("-r")) std::reverse(lines.begin(), lines.end());
             for (const QString& l : lines) ui->appendOutput(l + "\n");
         }
-    }, "排序", "sort");
+    }, "排序", "sort [-r] <文件>");
 
     registerCommand("uniq", [ui](const QStringList& args) {
-        if (args.isEmpty()) return;
+        if (args.isEmpty()) { ui->appendOutput("用法: uniq <文件>\n", ERROR_COLOR); return; }
         QFile file(QDir(ui->currentDir).absoluteFilePath(args[0]));
         if (file.open(QIODevice::ReadOnly)) {
             QStringList lines = QString(file.readAll()).split('\n', Qt::SkipEmptyParts);
@@ -369,7 +371,7 @@ void CommandRegistry::registerFileCommands(TerminalWidget* ui) {
             for (const QString& l : lines)
                 if (!seen.contains(l)) { ui->appendOutput(l + "\n"); seen.insert(l); }
         }
-    }, "去重", "uniq");
+    }, "去重", "uniq <文件>");
 
     registerCommand("cut", [ui](const QStringList& args) {
         QString delim = ","; QList<int> fields; QString fn;
@@ -379,7 +381,7 @@ void CommandRegistry::registerFileCommands(TerminalWidget* ui) {
                 for (const QString& f : args[++i].split(',')) fields.append(f.toInt() - 1);
             else fn = args[i];
         }
-        if (fn.isEmpty()) return;
+        if (fn.isEmpty()) { ui->appendOutput("用法: cut -d <分隔符> -f <字段> <文件>\n", ERROR_COLOR); return; }
         QFile file(QDir(ui->currentDir).absoluteFilePath(fn));
         if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
             QTextStream in(&file);
@@ -391,22 +393,22 @@ void CommandRegistry::registerFileCommands(TerminalWidget* ui) {
             }
             file.close();
         }
-    }, "剪切", "cut");
+    }, "剪切", "cut -d <分隔符> -f <字段> <文件>");
 
     registerCommand("stat", [ui](const QStringList& args) {
-        if (args.isEmpty()) return;
+        if (args.isEmpty()) { ui->appendOutput("用法: stat <文件>\n", ERROR_COLOR); return; }
         QFileInfo info(QDir(ui->currentDir).absoluteFilePath(args[0]));
         if (info.exists())
             ui->appendOutput(QString("大小:%1 修改:%2\n").arg(info.size())
                 .arg(info.lastModified().toString("yyyy-MM-dd hh:mm")));
-    }, "状态", "stat");
+    }, "状态", "stat <文件>");
 
     registerCommand("file", [ui](const QStringList& args) {
-        if (args.isEmpty()) return;
+        if (args.isEmpty()) { ui->appendOutput("用法: file <文件>\n", ERROR_COLOR); return; }
         QFileInfo info(QDir(ui->currentDir).absoluteFilePath(args[0]));
         if (info.isDir()) ui->appendOutput(args[0] + ": directory\n");
         else if (info.isFile()) ui->appendOutput(QString("%1: file, %2 bytes\n").arg(args[0]).arg(info.size()));
-    }, "类型", "file");
+    }, "类型", "file <文件>");
 
     registerCommand("du", [ui](const QStringList& args) {
         QString target = args.isEmpty() ? ui->currentDir : QDir(ui->currentDir).absoluteFilePath(args[0]);
@@ -414,7 +416,7 @@ void CommandRegistry::registerFileCommands(TerminalWidget* ui) {
         QDirIterator it(target, QDir::Files, QDirIterator::Subdirectories);
         while (it.hasNext()) { it.next(); total += it.fileInfo().size(); }
         ui->appendOutput(Utils::formatSize(total) + "\t" + target + "\n");
-    }, "磁盘使用", "du");
+    }, "磁盘使用", "du [目录]");
 
     registerCommand("df", [ui](const QStringList& args) {
         QString target = ui->currentDir;
@@ -423,12 +425,12 @@ void CommandRegistry::registerFileCommands(TerminalWidget* ui) {
         if (storage.isValid())
             ui->appendOutput(QString("总量:%1 可用:%2\n")
                 .arg(Utils::formatSize(storage.bytesTotal()), Utils::formatSize(storage.bytesAvailable())));
-    }, "磁盘空间", "df");
+    }, "磁盘空间", "df [目录]");
 
     registerCommand("chmod", [ui](const QStringList& args) {
-        if (args.size() < 2) return;
+        if (args.size() < 2) { ui->appendOutput("用法: chmod <权限> <文件>\n", ERROR_COLOR); return; }
         bool ok; int mode = args[0].toInt(&ok, 8);
-        if (!ok) return;
+        if (!ok) { ui->appendOutput("权限格式错误 (如 755)\n", ERROR_COLOR); return; }
         QFile::Permissions perms;
         if (mode & 0400) perms |= QFileDevice::ReadOwner;
         if (mode & 0200) perms |= QFileDevice::WriteOwner;
@@ -440,11 +442,11 @@ void CommandRegistry::registerFileCommands(TerminalWidget* ui) {
         if (mode & 0002) perms |= QFileDevice::WriteOther;
         if (mode & 0001) perms |= QFileDevice::ExeOther;
         QFile::setPermissions(QDir(ui->currentDir).absoluteFilePath(args[1]), perms);
-    }, "权限", "chmod");
+    }, "权限", "chmod <权限> <文件>");
 
     registerCommand("which", [ui](const QStringList& args) {
-        if (args.isEmpty()) return;
+        if (args.isEmpty()) { ui->appendOutput("用法: which <命令>\n", ERROR_COLOR); return; }
         QString path = QStandardPaths::findExecutable(args[0]);
         ui->appendOutput(path.isEmpty() ? QString("未找到: %1\n").arg(args[0]) : path + "\n");
-    }, "查找命令", "which");
+    }, "查找命令", "which <命令>");
 }

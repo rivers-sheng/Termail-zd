@@ -5,16 +5,14 @@
 #include <QStandardPaths>
 #include <exception>
 
-#include <QSettings>
-
 #include "terminal/terminal.h"
 #include "config.h"
+#include "utils/selfcheck.h"
 
 #ifdef Q_OS_ANDROID
 #include <QJniObject>
 #endif
 
-// 崩溃处理
 void crashHandler() {
     QString logDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     QDir().mkpath(logDir);
@@ -67,6 +65,7 @@ int main(int argc, char* argv[]) {
 
     std::set_terminate(crashHandler);
 
+    // 直接初始化终端，所有文件写入和进度条自检全交由 TerminalWidget 内部完成
     TerminalWidget terminal;
 
 #ifdef Q_OS_ANDROID

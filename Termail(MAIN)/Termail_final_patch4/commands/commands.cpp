@@ -24,6 +24,14 @@ QStringList CommandRegistry::getCommandNames() const {
     return commands.keys();
 }
 
+QString CommandRegistry::getCommandDesc(const QString& name) const {
+    return descriptions.value(name, "无简介");
+}
+
+QString CommandRegistry::getCommandUsage(const QString& name) const {
+    return usages.value(name, "无用法说明");
+}
+
 void CommandRegistry::registerAllBuiltins(TerminalWidget* ui) {
     registerFileCommands(ui);
     registerNetworkCommands(ui);
