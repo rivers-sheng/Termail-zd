@@ -100,15 +100,16 @@ void TerminalWidget::initCommands() {
 
 void TerminalWidget::displayWelcome() {
     QString welcome = QString(
-        " Termail Games特别版\n"
-        " 输入 'help' 查看所有命令\n"
-        " 制作:rivers晟 github:jiang-sheng\n"
-        " 辅助制作:deepseek chat\n"
-        " 邮箱:k-jiangsheng@outlook.com\n"
-        " ©rivers晟 GNU GENERAL PUBLIC LICENSE\n"
-        " 输入 'exit' 退出\n"
-        "  \n"
-        "\n"
+        "\n  Termail特别版\n"
+        "  制作:rivers晟 github:jiang-sheng\n"
+        "  开源地址:https://github.com/rivers-sheng/Termail-zd\n"
+        "  辅助制作:deepseek chat\n"
+        "  邮箱:k-jiangsheng@outlook.com\n"
+        "  ©rivers晟 GNU AFFERO GENERAL PUBLIC LICENSE\n"
+        "  输入 'help' 查看所有命令\n"
+        "  输入 'exit' 退出\n\n"
+
+        "  感谢使用Termail特别版！\n"
     ).arg(APP_VERSION);
     appendOutput(welcome, ACCENT_COLOR);
 }
