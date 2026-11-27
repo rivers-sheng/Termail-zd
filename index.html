@@ -59,6 +59,7 @@
   /* 导航 */
   .nav {
     position: sticky; top: 0; z-index: 100;
+    background: rgba(13,13,15,.88);
     background: color-mix(in srgb, var(--bg) 88%, transparent);
     backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--border);
@@ -160,7 +161,7 @@
     background: var(--accent); color: #0a0a0c; font-weight: 700;
     box-shadow: 0 0 0 0 var(--accent-soft);
   }
-  .btn-primary:hover { background: color-mix(in srgb, var(--accent) 85%, #fff); transform: translateY(-1px); box-shadow: 0 8px 24px -8px var(--accent); }
+  .btn-primary:hover { background: #56e693; background: color-mix(in srgb, var(--accent) 85%, #fff); transform: translateY(-1px); box-shadow: 0 8px 24px -8px var(--accent); }
   .btn-ghost {
     background: var(--panel); color: var(--fg); border-color: var(--border);
   }
@@ -189,7 +190,7 @@
     background: linear-gradient(90deg, transparent, var(--accent), transparent);
     opacity: 0; transition: opacity .2s;
   }
-  .card:hover { border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); transform: translateY(-3px); box-shadow: 0 12px 32px -16px rgba(0,0,0,.5); }
+  .card:hover { border-color: #3a6b4f; border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); transform: translateY(-3px); box-shadow: 0 12px 32px -16px rgba(0,0,0,.5); }
   .card:hover::before { opacity: 1; }
   .card .ico {
     font-family: "JetBrains Mono", monospace; font-size: 11px;
@@ -207,7 +208,7 @@
     border-radius: 10px; padding: 20px 24px;
     transition: all .2s; display: flex; gap: 16px;
   }
-  .arch-item:hover { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
+  .arch-item:hover { border-color: #3a6b4f; border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
   .arch-num {
     font-family: "JetBrains Mono", monospace; font-size: 20px;
     font-weight: 700; color: var(--accent); opacity: .5;
@@ -221,7 +222,8 @@
   }
   .warn-tag {
     display: inline-block; font-size: 11px; font-family: "JetBrains Mono", monospace;
-    color: var(--warn); border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
+    color: var(--warn); border: 1px solid rgba(255,92,92,.4);
+    border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
     border-radius: 4px; padding: 1px 8px; margin-left: 8px; vertical-align: middle;
   }
 
@@ -286,7 +288,8 @@
   /* 日志 */
   .log-item {
     display: grid; grid-template-columns: 120px 1fr; gap: 24px;
-    padding: 22px 0; border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+    padding: 22px 0; border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
   }
   .log-item:last-child { border-bottom: none; }
   .log-ver {
@@ -318,7 +321,7 @@
     border-radius: 10px; margin-bottom: 10px; overflow: hidden;
     transition: border-color .15s;
   }
-  details:hover { border-color: color-mix(in srgb, var(--accent) 30%, var(--border)); }
+  details:hover { border-color: #3a6b4f; border-color: color-mix(in srgb, var(--accent) 30%, var(--border)); }
   details[open] { border-color: var(--accent-dim); }
   details summary {
     padding: 16px 20px; cursor: pointer; font-size: 15px;
@@ -343,10 +346,23 @@
     background: var(--panel); border: 1px solid var(--border);
     border-radius: 12px; padding: 28px; text-align: center;
     background-image: radial-gradient(ellipse at 50% 0%, var(--accent-soft), transparent 60%);
+    margin-bottom: 16px;
   }
   .download-card h3 { font-size: 20px; margin-bottom: 8px; }
+  .download-card h4 { font-size: 16px; margin-bottom: 16px; color: var(--fg); }
   .download-card p { color: var(--fg-dim); font-size: 14px; margin-bottom: 24px; }
   .download-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+
+  /* 历史版本按钮网格 */
+  .version-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 10px;
+  }
+  .version-grid .btn {
+    justify-content: center; font-size: 12.5px; padding: 10px 14px;
+    width: 100%;
+  }
 
   /* 回到顶部 */
   #toTop {
@@ -388,6 +404,7 @@
     section { padding: 44px 0; }
     .hero { padding: 56px 20px 44px; }
     #toTop { right: 16px; bottom: 16px; }
+    .version-grid { grid-template-columns: 1fr 1fr; }
   }
 </style>
 </head>
@@ -430,10 +447,10 @@
     <a class="btn btn-primary" href="https://github.com/rivers-sheng/Termail-zd" id="linkSource" target="_blank" rel="noopener">
       ⚡ 查看源码
     </a>
-    <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_final_patch5.v6.6.1.apk" id="linkDownload" target="_blank" rel="noopener">
+    <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_final_patch5.v6.6.1.apk" id="linkDownloadMain" target="_blank" rel="noopener">
       ⬇ 下载最新MAIN APK
     </a>
-      <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(GAME)/TermailGames_v1.4.apk" id="linkDownload" target="_blank" rel="noopener">
+    <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(GAME)/TermailGames_v1.4.apk" id="linkDownloadGame" target="_blank" rel="noopener">
       ⬇ 下载最新GAME APK
     </a>
   </div>
@@ -802,14 +819,14 @@
       </div>
     </div>
 
-    <h2>GAME版本</h2>
+    <h2 style="font-size:22px;margin:40px 0 8px;">GAME版本</h2>
 
     <div class="log-item">
       <div class="log-ver">v1.4.0<small>当前版本</small></div>
       <div class="log-body">
         <h4>体验优化与稳定性收尾</h4>
         <ul>
-          <li> 修改部分游戏bug</li>
+          <li>修改部分游戏bug</li>
         </ul>
       </div>
     </div>
@@ -846,7 +863,7 @@
       </div>
     </div>
     <div class="note info">
-      <strong>注意：只是简略版本的更新日志，完整更新日志位于<a href="https://github.com/rivers-sheng/Termail-zd/tree/main/termail-changelog" id="linkSource2" target="_blank" rel="noopener">GitHub</a></strong>
+      <strong>注意：只是简略版本的更新日志，完整更新日志位于<a href="https://github.com/rivers-sheng/Termail-zd/tree/main/termail-changelog" target="_blank" rel="noopener">GitHub</a></strong>
     </div>
   </div>
 </section>
@@ -946,89 +963,57 @@
       <div class="idx">// 08 获取</div>
       <h2>源码与下载</h2>
     </div>
+
+    <!-- 卡片 1：当前版本 -->
     <div class="download-card">
       <h3>开始使用 Termail-zd</h3>
       <p>开源项目，已归档/准备发布。APK 约 10.8 MB，基于 Qt 6.5.0 + C++17 + NDK 25.1 构建。</p>
       <div class="download-actions">
-        <a class="btn btn-primary" href="https://github.com/rivers-sheng/Termail-zd" id="linkSource2" target="_blank" rel="noopener">
+        <a class="btn btn-primary" href="https://github.com/rivers-sheng/Termail-zd" id="linkSourceBottom" target="_blank" rel="noopener">
           ⚡ 查看源码
         </a>
-        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_final_patch5.v6.6.1.apk" id="linkDownload2" target="_blank" rel="noopener">
-          ⬇ 下载MAIN 6.6.1 APK
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_final_patch5.v6.6.1.apk" id="linkDownloadMainBottom" target="_blank" rel="noopener">
+          ⬇ 下载 MAIN 6.6.1 APK
         </a>
-        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(GAME)/TermailGames_v1.4.apk" id="linkDownload2" target="_blank" rel="noopener">
-          ⬇ 下载GAME 1.4.0 APK
-        </a>
-      </div>
-      </div>
-      <div class="download-card">
-      <h3>历史版本-可能包含bug</h3>
-      <h4>MAIN版本</h4>
-      <div class="download-actions">
-        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_final_patch5.v6.6.1.apk" id="linkSource2" target="_blank" rel="noopener">
-          ⬇ 下载MAIN 6.6.1 APK
-        </a>
-        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_final_patch4.v6.6.0.apk" id="linkSource2" target="_blank" rel="noopener">
-          ⬇ 下载MAIN 6.6.0 APK
-        </a>
-        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_final_patch3.v6.5.1.apk" id="linkSource2" target="_blank" rel="noopener">
-          ⬇ 下载MAIN 6.5.1 APK
-        </a>
-        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_final_patch2.v6.5.0.apk" id="linkSource2" target="_blank" rel="noopener">
-          ⬇ 下载MAIN 6.5.0 APK
-        </a>
-        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_final_patch1.v6.4.0.apk" id="linkSource2" target="_blank" rel="noopener">
-          ⬇ 下载MAIN 6.4.0 APK
-        </a>
-        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_final.v6.2.0.apk" id="linkSource2" target="_blank" rel="noopener">
-          ⬇ 下载MAIN 6.2.0(final) APK
-        </a>
-        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_v6.2_Pro.apk" id="linkSource2" target="_blank" rel="noopener">
-          ⬇ 下载MAIN 6.2.0(pro) APK
-        </a>
-        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_6.2.apk" id="linkSource2" target="_blank" rel="noopener">
-          ⬇ 下载MAIN 6.2.0 APK
-        </a>
-        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_6.1.apk" id="linkSource2" target="_blank" rel="noopener">
-          ⬇ 下载MAIN 6.1.0 APK
-        </a>
-        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_v6.0.apk" id="linkSource2" target="_blank" rel="noopener">
-          ⬇ 下载MAIN 6.0.0 APK
-        </a>
-        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_5.4beta.apk" id="linkSource2" target="_blank" rel="noopener">
-          ⬇ 下载MAIN 5.4.0(beta) APK
-        </a>
-        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_v5.2.apk" id="linkSource2" target="_blank" rel="noopener">
-          ⬇ 下载MAIN 5.2.0 APK
-        </a>
-        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_v5.1.apk" id="linkSource2" target="_blank" rel="noopener">
-          ⬇ 下载MAIN 5.1.0 APK
-        </a>
-        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_v5.0.apk" id="linkSource2" target="_blank" rel="noopener">
-          ⬇ 下载MAIN 5.0.0 APK
-        </a>
-        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_v4.0.apk" id="linkSource2" target="_blank" rel="noopener">
-          ⬇ 下载MAIN 4.0.0 APK
-        </a>
-        </div>
-        </div>
-      <div class="download-card">
-      <h4>GAME版本</h4>
-      <div class="download-actions">
-         <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(GAME)/TermailGames_v1.4.apk" id="linkSource2" target="_blank" rel="noopener">
-          ⬇ 下载GAME 1.4.0 APK
-        </a>
-        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(GAME)/TermailGames_v1.2.apk" id="linkSource2" target="_blank" rel="noopener">
-          ⬇ 下载GAME 1.2.0 APK
-        </a>
-        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(GAME)/TermailGames_v1.1.apk" id="linkSource2" target="_blank" rel="noopener">
-          ⬇ 下载GAME 1.1.0 APK
-        </a>
-        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(GAME)/TermailGames_v1.0.apk" id="linkSource2" target="_blank" rel="noopener">
-          ⬇ 下载GAME 1.0.0 APK
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(GAME)/TermailGames_v1.4.apk" id="linkDownloadGameBottom" target="_blank" rel="noopener">
+          ⬇ 下载 GAME 1.4.0 APK
         </a>
       </div>
     </div>
+
+    <!-- 卡片 2：历史 MAIN 版本 -->
+    <div class="download-card">
+      <h4>历史版本 · MAIN（可能包含 bug）</h4>
+      <div class="version-grid">
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_final_patch5.v6.6.1.apk" target="_blank" rel="noopener">MAIN 6.6.1</a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_final_patch4.v6.6.0.apk" target="_blank" rel="noopener">MAIN 6.6.0</a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_final_patch3.v6.5.1.apk" target="_blank" rel="noopener">MAIN 6.5.1</a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_final_patch2.v6.5.0.apk" target="_blank" rel="noopener">MAIN 6.5.0</a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_final_patch1.v6.4.0.apk" target="_blank" rel="noopener">MAIN 6.4.0</a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_final.v6.2.0.apk" target="_blank" rel="noopener">MAIN 6.2.0 (final)</a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_v6.2_Pro.apk" target="_blank" rel="noopener">MAIN 6.2.0 (pro)</a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_6.2.apk" target="_blank" rel="noopener">MAIN 6.2.0</a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_6.1.apk" target="_blank" rel="noopener">MAIN 6.1.0</a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_v6.0.apk" target="_blank" rel="noopener">MAIN 6.0.0</a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_5.4beta.apk" target="_blank" rel="noopener">MAIN 5.4.0 (beta)</a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_v5.2.apk" target="_blank" rel="noopener">MAIN 5.2.0</a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_v5.1.apk" target="_blank" rel="noopener">MAIN 5.1.0</a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_v5.0.apk" target="_blank" rel="noopener">MAIN 5.0.0</a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_v4.0.apk" target="_blank" rel="noopener">MAIN 4.0.0</a>
+      </div>
+    </div>
+
+    <!-- 卡片 3：历史 GAME 版本 -->
+    <div class="download-card">
+      <h4>历史版本 · GAME（可能包含 bug）</h4>
+      <div class="version-grid">
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(GAME)/TermailGames_v1.4.apk" target="_blank" rel="noopener">GAME 1.4.0</a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(GAME)/TermailGames_v1.2.apk" target="_blank" rel="noopener">GAME 1.2.0</a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(GAME)/TermailGames_v1.1.apk" target="_blank" rel="noopener">GAME 1.1.0</a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(GAME)/TermailGames_v1.0.apk" target="_blank" rel="noopener">GAME 1.0.0</a>
+      </div>
+    </div>
+
     <div class="note info">
       <strong>提示：</strong>下载前请确认来源可信。如需自行构建，请参考仓库内的 <code>build_apk.sh</code>。
     </div>
@@ -1086,7 +1071,14 @@
 
 /* ---------- 链接空状态处理 ---------- */
 (function(){
-  const ids = ['linkSource','linkDownload','linkSource2','linkDownload2'];
+  const ids = [
+    'linkSource',
+    'linkDownloadMain',
+    'linkDownloadGame',
+    'linkSourceBottom',
+    'linkDownloadMainBottom',
+    'linkDownloadGameBottom'
+  ];
   ids.forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
