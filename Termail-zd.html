@@ -1,0 +1,1234 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Termail-zd · Android 终端模拟器</title>
+<style>
+  :root[data-theme="dark"] {
+    --bg: #0d0d0f;
+    --bg-elev: #141418;
+    --panel: #19191e;
+    --panel-2: #202027;
+    --border: #2b2b33;
+    --fg: #e0e0e4;
+    --fg-dim: #8b8b96;
+    --fg-faint: #5a5a64;
+    --accent: #3ddc84;
+    --accent-soft: rgba(61,220,132,.12);
+    --accent-dim: #2a9d5c;
+    --warn: #ff5c5c;
+    --info: #5aa9ff;
+    --code-bg: #101014;
+  }
+  :root[data-theme="light"] {
+    --bg: #f7f7f9;
+    --bg-elev: #ffffff;
+    --panel: #ffffff;
+    --panel-2: #f0f0f4;
+    --border: #e0e0e6;
+    --fg: #1a1a1f;
+    --fg-dim: #5c5c66;
+    --fg-faint: #9a9aa4;
+    --accent: #1a9e5a;
+    --accent-soft: rgba(26,158,90,.10);
+    --accent-dim: #158049;
+    --warn: #d33;
+    --info: #1a6fd4;
+    --code-bg: #f0f0f4;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg); color: var(--fg);
+    font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    line-height: 1.7; font-size: 15px;
+    transition: background .25s, color .25s;
+  }
+  a { color: var(--info); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code, pre, .mono { font-family: "JetBrains Mono", "Cascadia Code", Consolas, monospace; }
+
+  /* 滚动进度条 */
+  #progress {
+    position: fixed; top: 0; left: 0; height: 3px; width: 0;
+    background: linear-gradient(90deg, var(--accent), var(--info));
+    z-index: 999; transition: width .1s;
+  }
+
+  /* 导航 */
+  .nav {
+    position: sticky; top: 0; z-index: 100;
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-inner {
+    max-width: 1100px; margin: 0 auto;
+    display: flex; align-items: center; gap: 20px;
+    padding: 12px 20px; flex-wrap: wrap;
+  }
+  .brand {
+    font-family: "JetBrains Mono", monospace; font-weight: 700;
+    font-size: 18px; color: var(--accent); letter-spacing: .5px;
+  }
+  .brand span { color: var(--fg-faint); font-weight: 400; }
+  .nav-links { display: flex; gap: 4px; flex-wrap: wrap; margin-left: auto; }
+  .nav-links a {
+    color: var(--fg-dim); font-size: 13.5px;
+    padding: 6px 12px; border-radius: 6px;
+    transition: all .15s;
+  }
+  .nav-links a:hover { color: var(--accent); background: var(--accent-soft); text-decoration: none; }
+  .nav-links a.active { color: var(--accent); background: var(--accent-soft); }
+  .theme-btn {
+    background: var(--panel); border: 1px solid var(--border);
+    color: var(--fg-dim); width: 34px; height: 34px;
+    border-radius: 8px; cursor: pointer; font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all .15s;
+  }
+  .theme-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 0 20px; }
+
+  /* Hero */
+  .hero {
+    padding: 80px 20px 60px; text-align: center;
+    background:
+      radial-gradient(ellipse at 50% -20%, var(--accent-soft), transparent 55%),
+      linear-gradient(180deg, var(--bg-elev), var(--bg));
+    border-bottom: 1px solid var(--border);
+    position: relative; overflow: hidden;
+  }
+  .hero::before {
+    content: ""; position: absolute; inset: 0;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 40px 40px;
+    opacity: .18; mask-image: radial-gradient(ellipse at 50% 0%, #000 30%, transparent 75%);
+    pointer-events: none;
+  }
+  .hero > * { position: relative; }
+  .hero .tag {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: "JetBrains Mono", monospace; font-size: 12px;
+    color: var(--accent); border: 1px solid var(--accent-dim);
+    border-radius: 999px; padding: 4px 14px; margin-bottom: 20px;
+    background: var(--accent-soft);
+  }
+  .hero .tag::before {
+    content: ""; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent); animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+  .hero h1 {
+    font-size: clamp(32px, 5.5vw, 54px);
+    font-weight: 800; letter-spacing: -1.5px; margin-bottom: 16px;
+    background: linear-gradient(180deg, var(--fg), var(--fg-dim));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .hero h1 em {
+    font-style: normal; color: var(--accent);
+    background: linear-gradient(180deg, var(--accent), var(--accent-dim));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .hero p.lead {
+    color: var(--fg-dim); max-width: 640px; margin: 0 auto 28px; font-size: 16px;
+  }
+  .hero-meta {
+    display: flex; justify-content: center; gap: 10px;
+    flex-wrap: wrap; font-family: "JetBrains Mono", monospace;
+    font-size: 12.5px; margin-bottom: 36px;
+  }
+  .hero-meta span {
+    background: var(--panel); border: 1px solid var(--border);
+    padding: 6px 14px; border-radius: 6px; color: var(--fg-dim);
+  }
+  .hero-meta b { color: var(--fg); font-weight: 600; }
+
+  .hero-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-family: "JetBrains Mono", monospace; font-size: 13.5px;
+    padding: 12px 24px; border-radius: 8px; cursor: pointer;
+    border: 1px solid transparent; transition: all .15s;
+    text-decoration: none !important; white-space: nowrap;
+  }
+  .btn-primary {
+    background: var(--accent); color: #0a0a0c; font-weight: 700;
+    box-shadow: 0 0 0 0 var(--accent-soft);
+  }
+  .btn-primary:hover { background: color-mix(in srgb, var(--accent) 85%, #fff); transform: translateY(-1px); box-shadow: 0 8px 24px -8px var(--accent); }
+  .btn-ghost {
+    background: var(--panel); color: var(--fg); border-color: var(--border);
+  }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-1px); }
+
+  /* Section */
+  section { padding: 64px 0; border-bottom: 1px solid var(--border); }
+  section:last-of-type { border-bottom: none; }
+  .sec-head { margin-bottom: 36px; }
+  .sec-head .idx {
+    font-family: "JetBrains Mono", monospace; font-size: 12px;
+    color: var(--accent); letter-spacing: 1.5px;
+  }
+  .sec-head h2 { font-size: 28px; font-weight: 700; margin-top: 6px; letter-spacing: -.5px; }
+  .sec-head p { color: var(--fg-dim); margin-top: 10px; max-width: 700px; }
+
+  /* 网格卡片 */
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 22px;
+    transition: all .2s; position: relative; overflow: hidden;
+  }
+  .card::before {
+    content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0; transition: opacity .2s;
+  }
+  .card:hover { border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); transform: translateY(-3px); box-shadow: 0 12px 32px -16px rgba(0,0,0,.5); }
+  .card:hover::before { opacity: 1; }
+  .card .ico {
+    font-family: "JetBrains Mono", monospace; font-size: 11px;
+    color: var(--accent); letter-spacing: 1.5px; margin-bottom: 12px;
+    display: inline-block; padding: 3px 9px; border-radius: 4px;
+    background: var(--accent-soft);
+  }
+  .card h4 { font-size: 16px; margin-bottom: 8px; }
+  .card p { font-size: 14px; color: var(--fg-dim); }
+
+  /* 架构 */
+  .arch-list { display: grid; gap: 14px; }
+  .arch-item {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 20px 24px;
+    transition: all .2s; display: flex; gap: 16px;
+  }
+  .arch-item:hover { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
+  .arch-num {
+    font-family: "JetBrains Mono", monospace; font-size: 20px;
+    font-weight: 700; color: var(--accent); opacity: .5;
+    flex-shrink: 0; line-height: 1.4;
+  }
+  .arch-body h4 { font-size: 15px; margin-bottom: 6px; font-family: "JetBrains Mono", monospace; color: var(--fg); }
+  .arch-body p { font-size: 14px; color: var(--fg-dim); }
+  .arch-body code, .ans code, .card code {
+    background: var(--code-bg); padding: 2px 7px; border-radius: 4px;
+    font-size: 12.5px; color: var(--accent); border: 1px solid var(--border);
+  }
+  .warn-tag {
+    display: inline-block; font-size: 11px; font-family: "JetBrains Mono", monospace;
+    color: var(--warn); border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
+    border-radius: 4px; padding: 1px 8px; margin-left: 8px; vertical-align: middle;
+  }
+
+  /* 命令搜索 */
+  .cmd-toolbar {
+    display: flex; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; align-items: center;
+  }
+  .cmd-search {
+    flex: 1; min-width: 220px;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 11px 16px;
+    color: var(--fg); font-family: "JetBrains Mono", monospace;
+    font-size: 13.5px; outline: none; transition: border-color .15s;
+  }
+  .cmd-search:focus { border-color: var(--accent); }
+  .cmd-search::placeholder { color: var(--fg-faint); }
+  .cmd-count {
+    font-family: "JetBrains Mono", monospace; font-size: 12.5px;
+    color: var(--fg-faint); white-space: nowrap;
+  }
+  .tabs { display: flex; gap: 6px; margin-bottom: 18px; flex-wrap: wrap; }
+  .tab {
+    background: var(--panel); border: 1px solid var(--border);
+    color: var(--fg-dim); padding: 7px 16px; border-radius: 6px;
+    cursor: pointer; font-size: 13px; font-family: "JetBrains Mono", monospace;
+    transition: all .15s;
+  }
+  .tab:hover { border-color: var(--accent-dim); color: var(--fg); }
+  .tab.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+
+  .cmd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
+  .cmd-item {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 14px 16px;
+    display: flex; flex-direction: column; gap: 4px;
+    transition: all .15s; cursor: default;
+  }
+  .cmd-item:hover { border-color: var(--accent-dim); background: var(--panel-2); }
+  .cmd-item .name {
+    font-family: "JetBrains Mono", monospace; font-size: 14px;
+    color: var(--accent); font-weight: 600;
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  }
+  .cmd-item .name .copy {
+    font-size: 11px; color: var(--fg-faint); cursor: pointer;
+    padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border);
+    background: var(--bg); transition: all .15s; font-weight: 400;
+  }
+  .cmd-item .name .copy:hover { color: var(--accent); border-color: var(--accent); }
+  .cmd-item .desc { font-size: 13px; color: var(--fg-dim); }
+  .cmd-item .usage {
+    font-family: "JetBrains Mono", monospace; font-size: 12px;
+    color: var(--fg-faint); background: var(--code-bg);
+    padding: 4px 8px; border-radius: 4px; margin-top: 4px;
+    overflow-x: auto; white-space: nowrap;
+  }
+  .cmd-empty {
+    grid-column: 1/-1; text-align: center; padding: 40px;
+    color: var(--fg-faint); font-family: "JetBrains Mono", monospace; font-size: 14px;
+  }
+
+  /* 日志 */
+  .log-item {
+    display: grid; grid-template-columns: 120px 1fr; gap: 24px;
+    padding: 22px 0; border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  }
+  .log-item:last-child { border-bottom: none; }
+  .log-ver {
+    font-family: "JetBrains Mono", monospace; font-size: 14px;
+    color: var(--accent); font-weight: 700; padding-top: 2px;
+  }
+  .log-ver small { display: block; color: var(--fg-faint); font-weight: 400; font-size: 11px; margin-top: 3px; }
+  .log-body h4 { font-size: 15px; margin-bottom: 10px; }
+  .log-body ul { list-style: none; }
+  .log-body li {
+    font-size: 14px; color: var(--fg-dim);
+    padding-left: 18px; position: relative; margin-bottom: 6px;
+  }
+  .log-body li::before { content: "▸"; position: absolute; left: 0; color: var(--accent-dim); }
+
+  /* 提示框 */
+  .note {
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px 20px; font-size: 14px;
+    color: var(--fg-dim); margin-top: 20px;
+  }
+  .note strong { color: var(--fg); }
+  .note.warn { border-left: 3px solid var(--warn); }
+  .note.info { border-left: 3px solid var(--info); }
+
+  /* FAQ */
+  details {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; margin-bottom: 10px; overflow: hidden;
+    transition: border-color .15s;
+  }
+  details:hover { border-color: color-mix(in srgb, var(--accent) 30%, var(--border)); }
+  details[open] { border-color: var(--accent-dim); }
+  details summary {
+    padding: 16px 20px; cursor: pointer; font-size: 15px;
+    list-style: none; position: relative; padding-right: 44px;
+    transition: color .15s;
+  }
+  details summary::-webkit-details-marker { display: none; }
+  details summary::after {
+    content: "+"; position: absolute; right: 20px; top: 50%;
+    transform: translateY(-50%); color: var(--accent);
+    font-family: "JetBrains Mono", monospace; font-size: 18px;
+  }
+  details[open] summary::after { content: "−"; }
+  details summary:hover { color: var(--accent); }
+  details .ans {
+    padding: 14px 20px 18px; font-size: 14px; color: var(--fg-dim);
+    border-top: 1px solid var(--border);
+  }
+
+  /* 下载区 */
+  .download-card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px; padding: 28px; text-align: center;
+    background-image: radial-gradient(ellipse at 50% 0%, var(--accent-soft), transparent 60%);
+  }
+  .download-card h3 { font-size: 20px; margin-bottom: 8px; }
+  .download-card p { color: var(--fg-dim); font-size: 14px; margin-bottom: 24px; }
+  .download-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+
+  /* 回到顶部 */
+  #toTop {
+    position: fixed; right: 24px; bottom: 24px;
+    width: 44px; height: 44px; border-radius: 12px;
+    background: var(--panel); border: 1px solid var(--border);
+    color: var(--accent); font-size: 18px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none; transform: translateY(10px);
+    transition: all .25s; z-index: 90;
+    box-shadow: 0 8px 24px -8px rgba(0,0,0,.4);
+  }
+  #toTop.show { opacity: 1; pointer-events: auto; transform: translateY(0); }
+  #toTop:hover { border-color: var(--accent); }
+
+  /* Toast */
+  #toast {
+    position: fixed; left: 50%; bottom: 32px;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--panel-2); border: 1px solid var(--accent-dim);
+    color: var(--fg); padding: 10px 20px; border-radius: 8px;
+    font-family: "JetBrains Mono", monospace; font-size: 13px;
+    opacity: 0; pointer-events: none; transition: all .25s; z-index: 999;
+    box-shadow: 0 12px 32px -12px rgba(0,0,0,.6);
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  footer {
+    padding: 44px 20px; text-align: center;
+    color: var(--fg-faint); font-size: 13px;
+    font-family: "JetBrains Mono", monospace;
+    border-top: 1px solid var(--border);
+  }
+  footer .sig { color: var(--accent-dim); margin-bottom: 8px; }
+
+  @media (max-width: 700px) {
+    .log-item { grid-template-columns: 1fr; gap: 8px; }
+    .nav-links { display: none; }
+    section { padding: 44px 0; }
+    .hero { padding: 56px 20px 44px; }
+    #toTop { right: 16px; bottom: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<!-- ===================== 导航 ===================== -->
+<nav class="nav">
+  <div class="nav-inner">
+    <div class="brand">Termail<span>-zd</span></div>
+    <div class="nav-links">
+      <a href="#intro">简介</a>
+      <a href="#features">特性</a>
+      <a href="#arch">架构</a>
+      <a href="#commands">命令</a>
+      <a href="#changelog">日志</a>
+      <a href="#faq">FAQ</a>
+      <a href="#download">下载</a>
+    </div>
+    <button class="theme-btn" id="themeBtn" title="切换主题">◐</button>
+  </div>
+</nav>
+
+<!-- ===================== Hero ===================== -->
+<header class="hero">
+  <div class="tag">Android Terminal Emulator</div>
+  <h1>Termail<em>-zd</em></h1>
+  <p class="lead">
+    为 Android 打造的轻量级终端模拟器。基于 Qt 6 与 C++17 构建，直接调用系统原生工具链，在手机上提供接近桌面的终端体验。
+  </p>
+  <div class="hero-meta">
+    <span>版本 <b>v6.6.1</b></span>
+    <span>APK <b>约 10.8 MB</b></span>
+    <span>框架 <b>Qt 6.5.0</b></span>
+    <span>标准 <b>C++17</b></span>
+    <span>NDK <b>25.1</b></span>
+  </div>
+  <div class="hero-actions">
+    <a class="btn btn-primary" href="https://github.com/rivers-sheng/Termail-zd" id="linkSource" target="_blank" rel="noopener">
+      ⚡ 查看源码
+    </a>
+    <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_final_patch5.v6.6.1.apk" id="linkDownload" target="_blank" rel="noopener">
+      ⬇ 下载最新MAIN APK
+    </a>
+      <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(GAME)/TermailGames_v1.4.apk" id="linkDownload" target="_blank" rel="noopener">
+      ⬇ 下载最新GAME APK
+    </a>
+  </div>
+</header>
+
+<!-- ===================== 简介 ===================== -->
+<section id="intro">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="idx">// 01 简介</div>
+      <h2>为什么是 Termail</h2>
+      <p>
+        大多数 Android 终端方案依赖 PRoot 容器或打包一整份 busybox，体积大、启动慢、与系统环境隔离。
+        Termail 走另一条路：不搬运运行时，直接复用系统自带的 toybox 与原生二进制，
+        把体积压到 10 MB 出头，启动压到毫秒级。
+      </p>
+    </div>
+    <div class="grid">
+      <div class="card">
+        <div class="ico">SIZE</div>
+        <h4>轻量</h4>
+        <p>无 PRoot、无内置 busybox，APK 约 10.8 MB。不额外搬运运行时，安装即用。</p>
+      </div>
+      <div class="card">
+        <div class="ico">NATIVE</div>
+        <h4>原生工具链</h4>
+        <p>强制通过系统 toybox 或安卓原生命令执行，与系统环境保持一致。</p>
+      </div>
+      <div class="card">
+        <div class="ico">STABLE</div>
+        <h4>稳定优先</h4>
+        <p>去掉启动期异步自检，改用硬编码白名单，规避 SIGSEGV 与主线程卡死。</p>
+      </div>
+      <div class="card">
+        <div class="ico">SERVE</div>
+        <h4>内置 HTTP 服务</h4>
+        <p>独立线程运行，支持多用户权限、在线状态轮询、HTML 运行器与 IP 黑名单。</p>
+      </div>
+      <div class="card">
+        <div class="ico">EDITOR</div>
+        <h4>图形化编辑器</h4>
+        <p>全屏编辑、查找替换、行号显示与滚动同步，适合手机小屏操作。</p>
+      </div>
+      <div class="card">
+        <div class="ico">SSH</div>
+        <h4>主机管理</h4>
+        <p>ssh-host / ssh-connect / ssh-keygen / ssh-tunnel 一整套命令封装。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 特性 ===================== -->
+<section id="features">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="idx">// 02 特性</div>
+      <h2>核心能力一览</h2>
+      <p>从终端输入到文件管理，从 SSH 到内置 Web 服务，Termail 把常用场景都收进了一个 APK。</p>
+    </div>
+    <div class="grid">
+      <div class="card">
+        <div class="ico">TERM</div>
+        <h4>完整终端</h4>
+        <p>支持 ANSI 转义、颜色、光标控制、触摸滚动与软键盘适配，长按选择复制。</p>
+      </div>
+      <div class="card">
+        <div class="ico">CMD</div>
+        <h4>命令体系</h4>
+        <p>242 个核心命令 + 118 个扩展命令，help / more 支持关键词模糊筛选。</p>
+      </div>
+      <div class="card">
+        <div class="ico">FILE</div>
+        <h4>文件管理</h4>
+        <p>内置 ls / cp / mv / rm / mkdir / touch，配合图形化编辑器处理文本文件。</p>
+      </div>
+      <div class="card">
+        <div class="ico">NET</div>
+        <h4>网络工具</h4>
+        <p>ping、curl、wget 等常用网络命令，配合 serve 可快速搭建本地服务。</p>
+      </div>
+      <div class="card">
+        <div class="ico">SEC</div>
+        <h4>安全护栏</h4>
+        <p>ssh 参数校验、路径穿越防护、shell 注入转义、超时保护，多层防御。</p>
+      </div>
+      <div class="card">
+        <div class="ico">UI</div>
+        <h4>移动端优化</h4>
+        <p>暗色主题、底部状态栏进度、触摸拖拽滚动条，专为小屏设计。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 架构 ===================== -->
+<section id="arch">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="idx">// 03 架构</div>
+      <h2>核心设计决策</h2>
+      <p>当前架构是在多次崩溃、白屏与内存爆满之后收敛出的最优解。以下机制请勿轻易改动，每一条都对应过具体的事故。</p>
+    </div>
+    <div class="arch-list">
+      <div class="arch-item">
+        <div class="arch-num">01</div>
+        <div class="arch-body">
+          <h4>无 PRoot / 无内置 busybox</h4>
+          <p>所有底层依赖强制通过系统自带的 toybox 或安卓原生命令执行，避免运行时搬运带来的体积与兼容问题。</p>
+        </div>
+      </div>
+      <div class="arch-item">
+        <div class="arch-num">02</div>
+        <div class="arch-body">
+          <h4>去掉 QProcess 异步自检</h4>
+          <p>不在启动时用 QProcess 探测底层命令（ssh、vi 等）。这类探测极易导致 SIGSEGV 或卡死主线程，已彻底移除。</p>
+        </div>
+      </div>
+      <div class="arch-item">
+        <div class="arch-num">03</div>
+        <div class="arch-body">
+          <h4>白名单机制（Self-check.txt）</h4>
+          <p>纯 C++ 实现与确认存在的系统命令，硬编码在 <code>utils/selfcheck.h</code> 的 <code>getSafeBuiltins()</code> 中。首次启动由底部状态栏以 QTimer 异步、逐条、10ms 低超时探测外部命令，生成 <code>settings/termail/Self-check.txt</code>。全程不弹窗、不阻塞主线程。</p>
+        </div>
+      </div>
+      <div class="arch-item">
+        <div class="arch-num">04</div>
+        <div class="arch-body">
+          <h4>UI 交互分层</h4>
+          <p><code>help</code> 只显示 242 个核心命令，<code>more</code> 显示 118 个外部扩展命令，两者均支持关键词模糊筛选，例如 <code>help &lt;命令&gt;</code> 与 <code>more &lt;关键词&gt;</code>。</p>
+        </div>
+      </div>
+      <div class="arch-item">
+        <div class="arch-num">05</div>
+        <div class="arch-body">
+          <h4>HTTP 服务器（serve）<span class="warn-tag">安全优先</span></h4>
+          <p>独立线程/页面运行，已实现多用户权限、在线状态轮询、HTML 运行器、重命名/移动文件、日志持久化与 IP 黑名单。维护时优先保证密码哈希与 <code>http_users.json</code> 不外泄。</p>
+        </div>
+      </div>
+      <div class="arch-item">
+        <div class="arch-num">06</div>
+        <div class="arch-body">
+          <h4>ssh 交互模式<span class="warn-tag">已知风险</span></h4>
+          <p>底层安卓 ssh 在无 TTY 环境下可能崩溃。已在 v6.6.1 中加入参数校验与护栏，用户主动执行时给出明确提示，避免进程段错误。</p>
+        </div>
+      </div>
+    </div>
+    <div class="note warn">
+      <strong>注意：</strong>外部命令（如 apt、gcc、git、vim）的实际运行依赖第三方环境（Termux 或已 Root 的手机）。普通手机未安装对应环境时，会提示“命令未找到”，属预期行为。
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 命令 ===================== -->
+<section id="commands">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="idx">// 04 命令</div>
+      <h2>命令速查</h2>
+      <p>核心命令 242 个，扩展命令 118 个。下面是常用命令，可在终端内执行 <code>help</code> 或 <code>more</code> 查看完整列表。</p>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" data-cat="all">全部</button>
+      <button class="tab" data-cat="core">核心</button>
+      <button class="tab" data-cat="editor">编辑</button>
+      <button class="tab" data-cat="ssh">SSH</button>
+      <button class="tab" data-cat="net">网络</button>
+      <button class="tab" data-cat="file">文件</button>
+    </div>
+
+    <div class="cmd-toolbar">
+      <input class="cmd-search" id="cmdSearch" type="text" placeholder="搜索命令、说明或用法…" autocomplete="off">
+      <span class="cmd-count" id="cmdCount"></span>
+    </div>
+
+    <div class="cmd-grid" id="cmdGrid"></div>
+  </div>
+</section>
+
+<!-- ===================== 日志 ===================== -->
+<section id="changelog">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="idx">// 05 日志</div>
+      <h2>MAIN版本</h2>
+    </div>
+
+    <div class="log-item">
+      <div class="log-ver">v6.6.1<small>当前版本</small></div>
+      <div class="log-body">
+        <h4>体验优化与收尾</h4>
+        <ul>
+          <li>更好的serve，增加多种功能：聊天室，打包下载为zip格式，应急通道等等</li>
+          <li>编辑器全屏改造：改为全屏窗口，修正行号栏滚动同步与行高对齐。</li>
+          <li>清理历史包袱：去除所有异步测试代码、未使用的头文件与历史冗余代码。</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="log-item">
+      <div class="log-ver">v6.6.0<small>历史版本</small></div>
+      <div class="log-body">
+        <h4>更加适应安卓9+环境</h4>
+        <ul>
+          <li>核心底层重构：彻底移除 PRoot 与内置 busybox</li>
+          <li>HTTP 服务器深度优化</li>
+          <li>新增自检系统与白名单动态分类</li>
+          <li>文件操作调整，执行真实删除，防止假删除</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="log-item">
+      <div class="log-ver">v6.5.1<small>历史版本</small></div>
+      <div class="log-body">
+        <h4>修复应用适应安卓环境</h4>
+        <ul>
+          <li>HTTP 服务器大幅增强</li>
+          <li>文件操作安全强化</li>
+          <li>修复proot和busybox适应安卓问题</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="log-item">
+      <div class="log-ver">v6.5.0<small>历史版本</small></div>
+      <div class="log-body">
+        <h4>修复HTTP服务器</h4>
+        <ul>
+          <li>HTTP 服务器用户系统/页面新增功能与美化</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="log-item">
+      <div class="log-ver">v6.4.0<small>历史版本</small></div>
+      <div class="log-body">
+        <h4>体验优化</h4>
+        <ul>
+          <li>Lua 5.4 脚本引擎支持</li>
+          <li>nano全屏编辑器，支持保存、查找、替换、Ctrl+S/F/H 快捷键、修改提示、关闭前保存确认</li>
+          <li>HTTP 服务器重写为完整文件管理器：支持浏览、下载、上传、新建文件夹、删除、目录导航，带响应式 Web 界面与请求体完整性等待</li>
+          <li>合并大量命令</li>
+          <li>移除游戏</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="log-item">
+      <div class="log-ver">v6.2.0(final)<small>历史版本</small></div>
+      <div class="log-body">
+        <h4>体验优化</h4>
+        <ul>
+          <li>增加通知栏</li>
+          <li>SSH 增强</li>
+          <li>高危命令清单扩充</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="log-item">
+      <div class="log-ver">v6.2.0(pro)<small>历史版本</small></div>
+      <div class="log-body">
+        <h4>增加ubuntu</h4>
+        <ul>
+          <li>Ubuntu 发行版支持</li>
+          <li>更改proot配置ubuntu</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="log-item">
+      <div class="log-ver">v6.2.0<small>历史版本</small></div>
+      <div class="log-body">
+        <h4>体验优化</h4>
+        <ul>
+          <li>log系统日志新增按日志级别着色</li>
+          <li>主界面新增状态栏，实时显示当前目录、磁盘占用与会话编号</li>
+          <li>增加root 检测与根目录查看</li>
+          <li>增加SSH 密钥工具</li>
+          <li>ls增强配色</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="log-item">
+      <div class="log-ver">v6.1.0<small>历史版本</small></div>
+      <div class="log-body">
+        <h4>增加proot和alpine</h4>
+        <ul>
+          <li>新增PRoot 容器环境支持</li>
+          <li>欢迎信息新增"辅助制作:DeepSeek Chat"署名</li>
+          <li>超时机制调整为不限时</li>
+          <li>新增MANAGE_EXTERNAL_STORAGE与媒体读取权限</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="log-item">
+      <div class="log-ver">v6.0.0<small>历史版本</small></div>
+      <div class="log-body">
+        <h4>体验稳定</h4>
+        <ul>
+          <li>help命令说明表精简</li>
+          <li>删除大量help命令说明条目，仅保留常用命令</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="log-item">
+      <div class="log-ver">v5.4.0(beta)<small>历史版本</small></div>
+      <div class="log-body">
+        <h4>新测试（此版本容易崩溃）</h4>
+        <ul>
+          <li>ssh命令进入交互会话，输入直发进程</li>
+          <li>高危命令确认机制需confirm二次确认</li>
+          <li>get-busybox增加 SHA256 校验、可执行性验证、失败自动清理</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="log-item">
+      <div class="log-ver">v5.2.0<small>历史版本</small></div>
+      <div class="log-body">
+        <h4>增加更多命令</h4>
+        <ul>
+          <li>全屏系统日志窗口，支持过滤、/命令 执行、与程序日志切换</li>
+          <li>help命令说明表扩充，覆盖新增的众多命令</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="log-item">
+      <div class="log-ver">v5.1.0<small>历史版本</small></div>
+      <div class="log-body">
+        <h4>增加busybox</h4>
+        <ul>
+          <li>cmen改为busybox指引</li>
+          <li>内置busybox二进制资源</li>
+          <li>支持help<命令名>查看单条命令的具体用法</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="log-item">
+      <div class="log-ver">v5.0.0<small>历史版本</small></div>
+      <div class="log-body">
+        <h4>体验优化</h4>
+        <ul>
+          <li>由QMainWindow+菜单栏改为纯QWidget终端界面</li>
+          <li>扫雷重写为纯文本终端玩法，移除独立 GUI 扫雷窗口</li>
+          <li>欢迎信息与版权标识更新</li>
+          <li>cmenu命令完整命令菜单一览</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="log-item">
+      <div class="log-ver">v4.0.0<small>历史版本</small></div>
+      <div class="log-body">
+        <h4>一切开始的地方</h4>
+        <ul>
+          <li>保留py版本的所有功能</li>
+        </ul>
+      </div>
+    </div>
+
+    <h2>GAME版本</h2>
+
+    <div class="log-item">
+      <div class="log-ver">v1.4.0<small>当前版本</small></div>
+      <div class="log-body">
+        <h4>体验优化与稳定性收尾</h4>
+        <ul>
+          <li> 修改部分游戏bug</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="log-item">
+      <div class="log-ver">v1.2.0<small>历史版本</small></div>
+      <div class="log-body">
+        <h4>体验优化</h4>
+        <ul>
+          <li>新增 2 个 HTML 游戏</li>
+          <li>`guard-the-blue` 游戏即作者作者的获奖作品《守护蔚蓝》，获"深蓝百万里提升海洋素养数智创意传播大赛"赛道三·数智交互体验赛道初中组二等奖，此作品以unlicense开源</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="log-item">
+      <div class="log-ver">v1.1.0<small>历史版本</small></div>
+      <div class="log-body">
+        <h4>体验优化</h4>
+        <ul>
+          <li>新增 10 个 HTML 游戏</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="log-item">
+      <div class="log-ver">v1.0.0<small>历史版本</small></div>
+      <div class="log-body">
+        <h4>game分支</h4>
+        <ul>
+          <li>从 v6.5.0 剥离出来的「HTML 游戏启动器」精简版</li>
+          <li>只保留两个命令模块，纯终端趣味命令</li>
+        </ul>
+      </div>
+    </div>
+    <div class="note info">
+      <strong>注意：只是简略版本的更新日志，完整更新日志位于<a href="https://github.com/rivers-sheng/Termail-zd/tree/main/termail-changelog" id="linkSource2" target="_blank" rel="noopener">GitHub</a></strong>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 维护 ===================== -->
+<section id="maintain">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="idx">// 06 维护</div>
+      <h2>给后续维护者的建议</h2>
+      <p>以下每一条都来自实际事故，建议在改动前先读一遍。</p>
+    </div>
+    <div class="arch-list">
+      <div class="arch-item">
+        <div class="arch-num">◆</div>
+        <div class="arch-body">
+          <h4>不要再接入“全自动检测”</h4>
+          <p>安卓底层环境差异过大，越测越崩溃。核心命令写死在 <code>getSafeBuiltins()</code> 里是唯一正解。</p>
+        </div>
+      </div>
+      <div class="arch-item">
+        <div class="arch-num">◆</div>
+        <div class="arch-body">
+          <h4>修改 setupUI() 时别弄丢 QScrollBar</h4>
+          <p>滚动条样式与 QTextEdit viewport 耦合，在安卓终端上极难排查。改完务必在真机上用触摸拖拽验证一次，模拟器行为不同。</p>
+        </div>
+      </div>
+      <div class="arch-item">
+        <div class="arch-num">◆</div>
+        <div class="arch-body">
+          <h4>维护优先度</h4>
+          <p>serve 网页端安全性（密码存哈希、不泄露 http_users.json） &gt; 终端输入输出流畅 &gt; 命令响应提示。</p>
+        </div>
+      </div>
+      <div class="arch-item">
+        <div class="arch-num">◆</div>
+        <div class="arch-body">
+          <h4>构建与复现</h4>
+          <p>源码位于 <code>/home/sheng/Termail_final_patch4/</code>，修改后执行 <code>./build_apk.sh</code>。建议在无 gradle 缓存的 clean 环境跑一次，确认 APK 可独立构建。</p>
+        </div>
+      </div>
+      <div class="arch-item">
+        <div class="arch-num">◆</div>
+        <div class="arch-body">
+          <h4>Self-check.txt 会陈旧</h4>
+          <p>用户更换 ROM 或安装 Termux 后，旧的探测文件会与实际环境脱节，需要提供手动“重新探测”入口，但绝不可自动触发。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== FAQ ===================== -->
+<section id="faq">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="idx">// 07 FAQ</div>
+      <h2>常见问题</h2>
+    </div>
+
+    <details>
+      <summary>为什么执行 apt、gcc、vim 提示“命令未找到”？</summary>
+      <div class="ans">Termail 不内置这些外部工具，它们依赖第三方环境（Termux 或已 Root 的手机）。普通手机未安装对应环境时，提示“命令未找到”属预期行为，不是 Bug。</div>
+    </details>
+
+    <details>
+      <summary>ssh 连接时提示无 TTY 或直接退出怎么办？</summary>
+      <div class="ans">安卓底层 ssh 在无 TTY 环境下可能失败。v6.6.1 已加入护栏，会给出明确提示而非崩溃。交互式 ssh 的完整支持需要底层环境配合，暂时以提示为主。</div>
+    </details>
+
+    <details>
+      <summary>help 和 more 有什么区别？</summary>
+      <div class="ans"><code>help</code> 列出 242 个核心命令，<code>more</code> 列出 118 个外部扩展命令。两者都支持关键词筛选，例如 <code>help ssh</code> 或 <code>more git</code>。</div>
+    </details>
+
+    <details>
+      <summary>Self-check.txt 里的命令不全或过期了？</summary>
+      <div class="ans">该文件在首次启动时生成，反映当时的系统环境。更换 ROM 或安装 Termux 后可能陈旧。建议通过手动入口重新探测，而不是依赖自动检测。</div>
+    </details>
+
+    <details>
+      <summary>内置 HTTP 服务安全吗？</summary>
+      <div class="ans">serve 运行在独立线程，支持多用户权限、密码哈希存储与 IP 黑名单。使用时请勿将 <code>http_users.json</code> 暴露在静态路由下，并注意路径穿越与 URL 编码绕过风险。</div>
+    </details>
+
+    <details>
+      <summary>编辑器为什么改成全屏？</summary>
+      <div class="ans">手机横屏时，固定尺寸的对话框容易留边或被系统重排。全屏窗口配合 <code>Qt::Window</code> 与 <code>showFullScreen()</code>，能稳定占满真实屏幕，同时保留 Esc 与关闭按钮的可靠退出。</div>
+    </details>
+  </div>
+</section>
+
+<!-- ===================== 下载 ===================== -->
+<section id="download">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="idx">// 08 获取</div>
+      <h2>源码与下载</h2>
+    </div>
+    <div class="download-card">
+      <h3>开始使用 Termail-zd</h3>
+      <p>开源项目，已归档/准备发布。APK 约 10.8 MB，基于 Qt 6.5.0 + C++17 + NDK 25.1 构建。</p>
+      <div class="download-actions">
+        <a class="btn btn-primary" href="https://github.com/rivers-sheng/Termail-zd" id="linkSource2" target="_blank" rel="noopener">
+          ⚡ 查看源码
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_final_patch5.v6.6.1.apk" id="linkDownload2" target="_blank" rel="noopener">
+          ⬇ 下载MAIN 6.6.1 APK
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(GAME)/TermailGames_v1.4.apk" id="linkDownload2" target="_blank" rel="noopener">
+          ⬇ 下载GAME 1.4.0 APK
+        </a>
+      </div>
+      </div>
+      <div class="download-card">
+      <h3>历史版本-可能包含bug</h3>
+      <h4>MAIN版本</h4>
+      <div class="download-actions">
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_final_patch5.v6.6.1.apk" id="linkSource2" target="_blank" rel="noopener">
+          ⬇ 下载MAIN 6.6.1 APK
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_final_patch4.v6.6.0.apk" id="linkSource2" target="_blank" rel="noopener">
+          ⬇ 下载MAIN 6.6.0 APK
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_final_patch3.v6.5.1.apk" id="linkSource2" target="_blank" rel="noopener">
+          ⬇ 下载MAIN 6.5.1 APK
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_final_patch2.v6.5.0.apk" id="linkSource2" target="_blank" rel="noopener">
+          ⬇ 下载MAIN 6.5.0 APK
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_final_patch1.v6.4.0.apk" id="linkSource2" target="_blank" rel="noopener">
+          ⬇ 下载MAIN 6.4.0 APK
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_final.v6.2.0.apk" id="linkSource2" target="_blank" rel="noopener">
+          ⬇ 下载MAIN 6.2.0(final) APK
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_v6.2_Pro.apk" id="linkSource2" target="_blank" rel="noopener">
+          ⬇ 下载MAIN 6.2.0(pro) APK
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_6.2.apk" id="linkSource2" target="_blank" rel="noopener">
+          ⬇ 下载MAIN 6.2.0 APK
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_6.1.apk" id="linkSource2" target="_blank" rel="noopener">
+          ⬇ 下载MAIN 6.1.0 APK
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_v6.0.apk" id="linkSource2" target="_blank" rel="noopener">
+          ⬇ 下载MAIN 6.0.0 APK
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_5.4beta.apk" id="linkSource2" target="_blank" rel="noopener">
+          ⬇ 下载MAIN 5.4.0(beta) APK
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_v5.2.apk" id="linkSource2" target="_blank" rel="noopener">
+          ⬇ 下载MAIN 5.2.0 APK
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_v5.1.apk" id="linkSource2" target="_blank" rel="noopener">
+          ⬇ 下载MAIN 5.1.0 APK
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_v5.0.apk" id="linkSource2" target="_blank" rel="noopener">
+          ⬇ 下载MAIN 5.0.0 APK
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_v4.0.apk" id="linkSource2" target="_blank" rel="noopener">
+          ⬇ 下载MAIN 4.0.0 APK
+        </a>
+        </div>
+        </div>
+      <div class="download-card">
+      <h4>GAME版本</h4>
+      <div class="download-actions">
+         <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(GAME)/TermailGames_v1.4.apk" id="linkSource2" target="_blank" rel="noopener">
+          ⬇ 下载GAME 1.4.0 APK
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(GAME)/TermailGames_v1.2.apk" id="linkSource2" target="_blank" rel="noopener">
+          ⬇ 下载GAME 1.2.0 APK
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(GAME)/TermailGames_v1.1.apk" id="linkSource2" target="_blank" rel="noopener">
+          ⬇ 下载GAME 1.1.0 APK
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(GAME)/TermailGames_v1.0.apk" id="linkSource2" target="_blank" rel="noopener">
+          ⬇ 下载GAME 1.0.0 APK
+        </a>
+      </div>
+    </div>
+    <div class="note info">
+      <strong>提示：</strong>下载前请确认来源可信。如需自行构建，请参考仓库内的 <code>build_apk.sh</code>。
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="sig">Termail-zd · Android Terminal</div>
+  <div> ©rivers-sheng GNU AFFERO GENERAL PUBLIC LICENSE</div>
+  <div style="margin-top:6px;">Built with Qt 6 &amp; C++17</div>
+</footer>
+
+<button id="toTop" title="回到顶部">↑</button>
+<div id="toast"></div>
+
+<script>
+(function(){
+  const root = document.documentElement;
+  const btn = document.getElementById('themeBtn');
+  const saved = localStorage.getItem('termail-theme');
+  if (saved) root.setAttribute('data-theme', saved);
+  btn.addEventListener('click', () => {
+    const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    localStorage.setItem('termail-theme', next);
+    btn.textContent = next === 'dark' ? '◐' : '☀';
+  });
+  btn.textContent = root.getAttribute('data-theme') === 'dark' ? '◐' : '☀';
+})();
+
+/* ---------- 滚动进度 & 回到顶部 & 导航高亮 ---------- */
+(function(){
+  const bar = document.getElementById('progress');
+  const toTop = document.getElementById('toTop');
+  const links = [...document.querySelectorAll('.nav-links a')];
+  const sections = links.map(a => document.querySelector(a.getAttribute('href'))).filter(Boolean);
+
+  function onScroll(){
+    const h = document.documentElement;
+    const max = h.scrollHeight - h.clientHeight;
+    bar.style.width = max > 0 ? (h.scrollTop / max * 100) + '%' : '0%';
+    toTop.classList.toggle('show', h.scrollTop > 400);
+
+    let current = null;
+    for (const s of sections){
+      if (s.getBoundingClientRect().top <= 120) current = s.id;
+    }
+    links.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + current));
+  }
+  window.addEventListener('scroll', onScroll, {passive:true});
+  onScroll();
+
+  toTop.addEventListener('click', () => window.scrollTo({top:0, behavior:'smooth'}));
+})();
+
+/* ---------- 链接空状态处理 ---------- */
+(function(){
+  const ids = ['linkSource','linkDownload','linkSource2','linkDownload2'];
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (el.getAttribute('href') === '#'){
+      el.style.opacity = '.45';
+      el.style.pointerEvents = 'none';
+      el.title = '链接尚未填写';
+    }
+  });
+})();
+
+/* ---------- 命令数据 ---------- */
+const COMMANDS = [
+  {name:'help', desc:'查看核心命令列表', usage:'help [命令]', cat:'core'},
+  {name:'more', desc:'查看外部扩展命令', usage:'more [关键词]', cat:'core'},
+  {name:'clear', desc:'清屏', usage:'clear', cat:'core'},
+  {name:'exit', desc:'退出当前会话', usage:'exit', cat:'core'},
+  {name:'history', desc:'查看命令历史', usage:'history', cat:'core'},
+  {name:'echo', desc:'输出文本', usage:'echo <文本>', cat:'core'},
+  {name:'pwd', desc:'显示当前目录', usage:'pwd', cat:'core'},
+
+  {name:'edit', desc:'打开图形化编辑器', usage:'edit <文件>', cat:'editor'},
+  {name:'nano', desc:'编辑器别名', usage:'nano <文件>', cat:'editor'},
+  {name:'create', desc:'创建并编辑文件', usage:'create <文件>', cat:'editor'},
+  {name:'cat', desc:'查看文件内容', usage:'cat <文件>', cat:'editor'},
+  {name:'tee', desc:'写入文件并输出', usage:'tee <文件>', cat:'editor'},
+  {name:'grep', desc:'文本搜索', usage:'grep <模式> <文件>', cat:'editor'},
+  {name:'sed', desc:'流编辑器', usage:'sed <表达式> <文件>', cat:'editor'},
+
+  {name:'ssh-host', desc:'SSH 主机管理', usage:'ssh-host add|list|rm|edit|show', cat:'ssh'},
+  {name:'ssh-connect', desc:'按保存的主机快速连接', usage:'ssh-connect <主机名>', cat:'ssh'},
+  {name:'ssh-keygen', desc:'生成 SSH 密钥', usage:'ssh-keygen [-t rsa|ed25519]', cat:'ssh'},
+  {name:'ssh-pub', desc:'查看公钥', usage:'ssh-pub', cat:'ssh'},
+  {name:'ssh-copy', desc:'复制公钥到服务器', usage:'ssh-copy <用户@主机>', cat:'ssh'},
+  {name:'ssh-tunnel', desc:'SSH 端口转发', usage:'ssh-tunnel <本地端口:目标:端口> <主机>', cat:'ssh'},
+  {name:'ssh-list', desc:'列出密钥', usage:'ssh-list', cat:'ssh'},
+  {name:'ssh-rm', desc:'删除密钥', usage:'ssh-rm <密钥名>', cat:'ssh'},
+
+  {name:'serve', desc:'启动内置 HTTP 服务', usage:'serve', cat:'net'},
+  {name:'ping', desc:'网络连通性测试', usage:'ping <主机>', cat:'net'},
+  {name:'curl', desc:'HTTP 请求工具', usage:'curl <URL>', cat:'net'},
+  {name:'wget', desc:'下载文件', usage:'wget <URL>', cat:'net'},
+  {name:'ifconfig', desc:'查看网络接口', usage:'ifconfig', cat:'net'},
+  {name:'netstat', desc:'查看网络连接', usage:'netstat', cat:'net'},
+
+  {name:'ls', desc:'列出目录内容', usage:'ls [-l] [路径]', cat:'file'},
+  {name:'cd', desc:'切换目录', usage:'cd <路径>', cat:'file'},
+  {name:'cp', desc:'复制文件', usage:'cp <源> <目标>', cat:'file'},
+  {name:'mv', desc:'移动/重命名', usage:'mv <源> <目标>', cat:'file'},
+  {name:'rm', desc:'删除文件', usage:'rm <文件>', cat:'file'},
+  {name:'mkdir', desc:'创建目录', usage:'mkdir <目录>', cat:'file'},
+  {name:'touch', desc:'创建空文件', usage:'touch <文件>', cat:'file'},
+  {name:'chmod', desc:'修改权限', usage:'chmod <权限> <文件>', cat:'file'},
+];
+
+/* ---------- 命令渲染 ---------- */
+(function(){
+  const grid = document.getElementById('cmdGrid');
+  const search = document.getElementById('cmdSearch');
+  const countEl = document.getElementById('cmdCount');
+  const tabs = [...document.querySelectorAll('.tab')];
+  let activeCat = 'all';
+
+  function render(){
+    const q = search.value.trim().toLowerCase();
+    const list = COMMANDS.filter(c => {
+      const catOk = activeCat === 'all' || c.cat === activeCat;
+      const qOk = !q || c.name.toLowerCase().includes(q) ||
+                  c.desc.toLowerCase().includes(q) ||
+                  c.usage.toLowerCase().includes(q);
+      return catOk && qOk;
+    });
+
+    countEl.textContent = `显示 ${list.length} / ${COMMANDS.length}`;
+
+    if (list.length === 0){
+      grid.innerHTML = '<div class="cmd-empty">没有匹配的命令</div>';
+      return;
+    }
+
+    grid.innerHTML = list.map(c => `
+      <div class="cmd-item">
+        <div class="name">
+          <span>${c.name}</span>
+          <span class="copy" data-cmd="${c.name}">复制</span>
+        </div>
+        <div class="desc">${c.desc}</div>
+        <div class="usage">${escapeHtml(c.usage)}</div>
+      </div>
+    `).join('');
+
+    grid.querySelectorAll('.copy').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        copyText(btn.dataset.cmd);
+      });
+    });
+  }
+
+  function escapeHtml(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  search.addEventListener('input', render);
+  tabs.forEach(t => t.addEventListener('click', () => {
+    tabs.forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    activeCat = t.dataset.cat;
+    render();
+  }));
+
+  render();
+})();
+
+/* ---------- 复制 & Toast ---------- */
+function copyText(text){
+  const done = () => showToast('已复制: ' + text);
+  if (navigator.clipboard && window.isSecureContext){
+    navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+  } else {
+    fallbackCopy(text, done);
+  }
+}
+function fallbackCopy(text, cb){
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); cb(); } catch(e){}
+  document.body.removeChild(ta);
+}
+let toastTimer;
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
+}
+</script>
+
+</body>
+</html>
