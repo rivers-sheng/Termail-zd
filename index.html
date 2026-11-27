@@ -20,6 +20,7 @@
     --warn: #ff5c5c;
     --info: #5aa9ff;
     --code-bg: #101014;
+    --shadow: rgba(0,0,0,.5);
   }
   :root[data-theme="light"] {
     --bg: #f7f7f9;
@@ -36,6 +37,7 @@
     --warn: #d33;
     --info: #1a6fd4;
     --code-bg: #f0f0f4;
+    --shadow: rgba(0,0,0,.12);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html { scroll-behavior: smooth; }
@@ -49,7 +51,6 @@
   a:hover { text-decoration: underline; }
   code, pre, .mono { font-family: "JetBrains Mono", "Cascadia Code", Consolas, monospace; }
 
-  /* 滚动进度条 */
   #progress {
     position: fixed; top: 0; left: 0; height: 3px; width: 0;
     background: linear-gradient(90deg, var(--accent), var(--info));
@@ -63,7 +64,9 @@
     background: color-mix(in srgb, var(--bg) 88%, transparent);
     backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--border);
+    transition: box-shadow .2s;
   }
+  .nav.scrolled { box-shadow: 0 6px 24px -12px var(--shadow); }
   .nav-inner {
     max-width: 1100px; margin: 0 auto;
     display: flex; align-items: center; gap: 20px;
@@ -95,7 +98,7 @@
 
   /* Hero */
   .hero {
-    padding: 80px 20px 60px; text-align: center;
+    padding: 72px 20px 56px; text-align: center;
     background:
       radial-gradient(ellipse at 50% -20%, var(--accent-soft), transparent 55%),
       linear-gradient(180deg, var(--bg-elev), var(--bg));
@@ -136,12 +139,52 @@
     -webkit-background-clip: text; background-clip: text; color: transparent;
   }
   .hero p.lead {
-    color: var(--fg-dim); max-width: 640px; margin: 0 auto 28px; font-size: 16px;
+    color: var(--fg-dim); max-width: 640px; margin: 0 auto 24px; font-size: 16px;
   }
+
+  /* 终端预览 */
+  .term-preview {
+    max-width: 560px; margin: 0 auto 30px;
+    background: #0a0a0c;
+    border: 1px solid #2b2b33;
+    border-radius: 10px;
+    box-shadow: 0 20px 60px -30px rgba(0,0,0,.8);
+    overflow: hidden; text-align: left;
+  }
+  .term-bar {
+    display: flex; align-items: center; gap: 7px;
+    padding: 10px 14px; background: #141418;
+    border-bottom: 1px solid #2b2b33;
+  }
+  .term-dot { width: 11px; height: 11px; border-radius: 50%; }
+  .term-dot.r { background: #ff5f57; }
+  .term-dot.y { background: #febc2e; }
+  .term-dot.g { background: #28c840; }
+  .term-title {
+    margin-left: 8px; font-family: "JetBrains Mono", monospace;
+    font-size: 11.5px; color: #5a5a64;
+  }
+  .term-body {
+    padding: 16px 18px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 13px; line-height: 1.9;
+    color: #c8c8ce;
+  }
+  .term-body .p { color: #3ddc84; }
+  .term-body .c { color: #e0e0e4; }
+  .term-body .o { color: #8b8b96; }
+  .term-body .err { color: #ff5c5c; }
+  .term-body .cursor {
+    display: inline-block; width: 8px; height: 15px;
+    background: #3ddc84; vertical-align: -2px;
+    animation: blink 1.1s steps(1) infinite;
+  }
+  @keyframes blink { 0%,49%{opacity:1} 50%,100%{opacity:0} }
+
   .hero-meta {
     display: flex; justify-content: center; gap: 10px;
     flex-wrap: wrap; font-family: "JetBrains Mono", monospace;
-    font-size: 12.5px; margin-bottom: 36px;
+    font-size: 12.5px; margin-bottom: 32px;
   }
   .hero-meta span {
     background: var(--panel); border: 1px solid var(--border);
@@ -151,7 +194,7 @@
 
   .hero-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
   .btn {
-    display: inline-flex; align-items: center; gap: 8px;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
     font-family: "JetBrains Mono", monospace; font-size: 13.5px;
     padding: 12px 24px; border-radius: 8px; cursor: pointer;
     border: 1px solid transparent; transition: all .15s;
@@ -167,7 +210,6 @@
   }
   .btn-ghost:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-1px); }
 
-  /* Section */
   section { padding: 64px 0; border-bottom: 1px solid var(--border); }
   section:last-of-type { border-bottom: none; }
   .sec-head { margin-bottom: 36px; }
@@ -178,7 +220,6 @@
   .sec-head h2 { font-size: 28px; font-weight: 700; margin-top: 6px; letter-spacing: -.5px; }
   .sec-head p { color: var(--fg-dim); margin-top: 10px; max-width: 700px; }
 
-  /* 网格卡片 */
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
   .card {
     background: var(--panel); border: 1px solid var(--border);
@@ -190,7 +231,7 @@
     background: linear-gradient(90deg, transparent, var(--accent), transparent);
     opacity: 0; transition: opacity .2s;
   }
-  .card:hover { border-color: #3a6b4f; border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); transform: translateY(-3px); box-shadow: 0 12px 32px -16px rgba(0,0,0,.5); }
+  .card:hover { border-color: #3a6b4f; border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); transform: translateY(-3px); box-shadow: 0 12px 32px -16px var(--shadow); }
   .card:hover::before { opacity: 1; }
   .card .ico {
     font-family: "JetBrains Mono", monospace; font-size: 11px;
@@ -201,7 +242,6 @@
   .card h4 { font-size: 16px; margin-bottom: 8px; }
   .card p { font-size: 14px; color: var(--fg-dim); }
 
-  /* 架构 */
   .arch-list { display: grid; gap: 14px; }
   .arch-item {
     background: var(--panel); border: 1px solid var(--border);
@@ -227,23 +267,31 @@
     border-radius: 4px; padding: 1px 8px; margin-left: 8px; vertical-align: middle;
   }
 
-  /* 命令搜索 */
+  /* 命令区 */
   .cmd-toolbar {
     display: flex; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; align-items: center;
   }
   .cmd-search {
-    flex: 1; min-width: 220px;
+    flex: 1; min-width: 200px;
     background: var(--panel); border: 1px solid var(--border);
     border-radius: 8px; padding: 11px 16px;
     color: var(--fg); font-family: "JetBrains Mono", monospace;
     font-size: 13.5px; outline: none; transition: border-color .15s;
   }
-  .cmd-search:focus { border-color: var(--accent); }
+  .cmd-search:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
   .cmd-search::placeholder { color: var(--fg-faint); }
   .cmd-count {
     font-family: "JetBrains Mono", monospace; font-size: 12.5px;
     color: var(--fg-faint); white-space: nowrap;
   }
+  .random-btn {
+    background: var(--panel); border: 1px solid var(--border);
+    color: var(--fg-dim); padding: 10px 16px; border-radius: 8px;
+    cursor: pointer; font-family: "JetBrains Mono", monospace;
+    font-size: 13px; transition: all .15s; white-space: nowrap;
+  }
+  .random-btn:hover { border-color: var(--accent); color: var(--accent); }
+
   .tabs { display: flex; gap: 6px; margin-bottom: 18px; flex-wrap: wrap; }
   .tab {
     background: var(--panel); border: 1px solid var(--border);
@@ -262,6 +310,16 @@
     transition: all .15s; cursor: default;
   }
   .cmd-item:hover { border-color: var(--accent-dim); background: var(--panel-2); }
+  .cmd-item.flash {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+    animation: flashPulse .9s ease;
+  }
+  @keyframes flashPulse {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.02); }
+    100% { transform: scale(1); }
+  }
   .cmd-item .name {
     font-family: "JetBrains Mono", monospace; font-size: 14px;
     color: var(--accent); font-weight: 600;
@@ -286,6 +344,30 @@
   }
 
   /* 日志 */
+  .log-filter { display: flex; gap: 6px; margin-bottom: 24px; flex-wrap: wrap; }
+  .log-filter button {
+    background: var(--panel); border: 1px solid var(--border);
+    color: var(--fg-dim); padding: 7px 16px; border-radius: 6px;
+    cursor: pointer; font-size: 13px; font-family: "JetBrains Mono", monospace;
+    transition: all .15s;
+  }
+  .log-filter button:hover { border-color: var(--accent-dim); color: var(--fg); }
+  .log-filter button.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+
+  .log-group { margin-bottom: 8px; }
+  .log-group[data-hidden="true"] { display: none; }
+  .log-group-title {
+    font-size: 20px; font-weight: 700; margin: 32px 0 8px;
+    letter-spacing: -.3px; display: flex; align-items: center; gap: 10px;
+  }
+  .log-group-title:first-child { margin-top: 0; }
+  .log-group-title .badge {
+    font-family: "JetBrains Mono", monospace; font-size: 11px;
+    color: var(--accent); background: var(--accent-soft);
+    border: 1px solid var(--accent-dim); border-radius: 4px;
+    padding: 1px 8px; font-weight: 400; letter-spacing: .5px;
+  }
+
   .log-item {
     display: grid; grid-template-columns: 120px 1fr; gap: 24px;
     padding: 22px 0; border-bottom: 1px solid var(--border);
@@ -305,7 +387,26 @@
   }
   .log-body li::before { content: "▸"; position: absolute; left: 0; color: var(--accent-dim); }
 
-  /* 提示框 */
+  /* 折叠日志 */
+  details.log-more {
+    background: transparent; border: none; border-radius: 0;
+    margin: 0; padding: 0;
+  }
+  details.log-more > summary {
+    list-style: none; cursor: pointer;
+    padding: 18px 0 18px 0;
+    font-family: "JetBrains Mono", monospace; font-size: 13px;
+    color: var(--fg-dim);
+    display: flex; align-items: center; gap: 8px;
+  }
+  details.log-more > summary::-webkit-details-marker { display: none; }
+  details.log-more > summary::before {
+    content: "▸"; color: var(--accent); font-size: 12px;
+    transition: transform .2s;
+  }
+  details.log-more[open] > summary::before { transform: rotate(90deg); }
+  details.log-more > summary:hover { color: var(--accent); }
+
   .note {
     background: var(--panel-2); border: 1px solid var(--border);
     border-radius: 10px; padding: 16px 20px; font-size: 14px;
@@ -345,26 +446,46 @@
   .download-card {
     background: var(--panel); border: 1px solid var(--border);
     border-radius: 12px; padding: 28px; text-align: center;
-    background-image: radial-gradient(ellipse at 50% 0%, var(--accent-soft), transparent 60%);
     margin-bottom: 16px;
+    transition: border-color .2s;
+  }
+  .download-card.primary {
+    border-color: var(--accent-dim);
+    background-image: radial-gradient(ellipse at 50% 0%, var(--accent-soft), transparent 60%);
+    box-shadow: 0 0 0 1px var(--accent-soft);
+  }
+  .download-card.history {
+    text-align: left;
+    background-image: none;
+    background: var(--panel-2);
   }
   .download-card h3 { font-size: 20px; margin-bottom: 8px; }
-  .download-card h4 { font-size: 16px; margin-bottom: 16px; color: var(--fg); }
+  .download-card h4 {
+    font-size: 15px; margin-bottom: 16px; color: var(--fg);
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+  .download-card h4 .tag-sm {
+    font-family: "JetBrains Mono", monospace; font-size: 11px;
+    color: var(--fg-faint); font-weight: 400;
+    border: 1px solid var(--border); border-radius: 4px;
+    padding: 1px 7px;
+  }
   .download-card p { color: var(--fg-dim); font-size: 14px; margin-bottom: 24px; }
   .download-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
 
-  /* 历史版本按钮网格 */
   .version-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
     gap: 10px;
   }
   .version-grid .btn {
     justify-content: center; font-size: 12.5px; padding: 10px 14px;
-    width: 100%;
+    width: 100%; background: var(--panel);
+  }
+  .version-grid .btn.current {
+    border-color: var(--accent-dim); color: var(--accent);
   }
 
-  /* 回到顶部 */
   #toTop {
     position: fixed; right: 24px; bottom: 24px;
     width: 44px; height: 44px; border-radius: 12px;
@@ -373,12 +494,11 @@
     display: flex; align-items: center; justify-content: center;
     opacity: 0; pointer-events: none; transform: translateY(10px);
     transition: all .25s; z-index: 90;
-    box-shadow: 0 8px 24px -8px rgba(0,0,0,.4);
+    box-shadow: 0 8px 24px -8px var(--shadow);
   }
   #toTop.show { opacity: 1; pointer-events: auto; transform: translateY(0); }
   #toTop:hover { border-color: var(--accent); }
 
-  /* Toast */
   #toast {
     position: fixed; left: 50%; bottom: 32px;
     transform: translateX(-50%) translateY(20px);
@@ -386,7 +506,8 @@
     color: var(--fg); padding: 10px 20px; border-radius: 8px;
     font-family: "JetBrains Mono", monospace; font-size: 13px;
     opacity: 0; pointer-events: none; transition: all .25s; z-index: 999;
-    box-shadow: 0 12px 32px -12px rgba(0,0,0,.6);
+    box-shadow: 0 12px 32px -12px var(--shadow);
+    max-width: calc(100vw - 40px);
   }
   #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
@@ -402,9 +523,10 @@
     .log-item { grid-template-columns: 1fr; gap: 8px; }
     .nav-links { display: none; }
     section { padding: 44px 0; }
-    .hero { padding: 56px 20px 44px; }
+    .hero { padding: 52px 20px 40px; }
     #toTop { right: 16px; bottom: 16px; }
     .version-grid { grid-template-columns: 1fr 1fr; }
+    .term-body { font-size: 11.5px; padding: 12px 14px; }
   }
 </style>
 </head>
@@ -413,7 +535,7 @@
 <div id="progress"></div>
 
 <!-- ===================== 导航 ===================== -->
-<nav class="nav">
+<nav class="nav" id="nav">
   <div class="nav-inner">
     <div class="brand">Termail<span>-zd</span></div>
     <div class="nav-links">
@@ -425,7 +547,7 @@
       <a href="#faq">FAQ</a>
       <a href="#download">下载</a>
     </div>
-    <button class="theme-btn" id="themeBtn" title="切换主题">◐</button>
+    <button class="theme-btn" id="themeBtn" title="切换主题（快捷键 T）">◐</button>
   </div>
 </nav>
 
@@ -436,6 +558,26 @@
   <p class="lead">
     为 Android 打造的轻量级终端模拟器。基于 Qt 6 与 C++17 构建，直接调用系统原生工具链，在手机上提供接近桌面的终端体验。
   </p>
+
+  <!-- 终端预览 -->
+  <div class="term-preview" aria-hidden="true">
+    <div class="term-bar">
+      <span class="term-dot r"></span>
+      <span class="term-dot y"></span>
+      <span class="term-dot g"></span>
+      <span class="term-title">termail — sh</span>
+    </div>
+    <div class="term-body">
+      <div><span class="p">$</span> <span class="c">help ssh</span></div>
+      <div class="o">ssh-host     主机管理</div>
+      <div class="o">ssh-connect  快速连接</div>
+      <div class="o">ssh-keygen   生成密钥</div>
+      <div><span class="p">$</span> <span class="c">edit notes.txt</span></div>
+      <div class="o">打开编辑器: notes.txt</div>
+      <div><span class="p">$</span> <span class="cursor"></span></div>
+    </div>
+  </div>
+
   <div class="hero-meta">
     <span>版本 <b>v6.6.1</b></span>
     <span>APK <b>约 10.8 MB</b></span>
@@ -610,7 +752,7 @@
     <div class="sec-head">
       <div class="idx">// 04 命令</div>
       <h2>命令速查</h2>
-      <p>核心命令 242 个，扩展命令 118 个。下面是常用命令，可在终端内执行 <code>help</code> 或 <code>more</code> 查看完整列表。</p>
+      <p>核心命令 242 个，扩展命令 118 个。下面是常用命令，可在终端内执行 <code>help</code> 或 <code>more</code> 查看完整列表。按 <code>/</code> 可快速聚焦搜索框。</p>
     </div>
 
     <div class="tabs">
@@ -623,7 +765,8 @@
     </div>
 
     <div class="cmd-toolbar">
-      <input class="cmd-search" id="cmdSearch" type="text" placeholder="搜索命令、说明或用法…" autocomplete="off">
+      <input class="cmd-search" id="cmdSearch" type="text" placeholder="搜索命令、说明或用法…（按 / 聚焦）" autocomplete="off">
+      <button class="random-btn" id="randomCmd" title="随机挑一条命令">🎲 随机</button>
       <span class="cmd-count" id="cmdCount"></span>
     </div>
 
@@ -636,234 +779,267 @@
   <div class="wrap">
     <div class="sec-head">
       <div class="idx">// 05 日志</div>
-      <h2>MAIN版本</h2>
+      <h2>版本日志</h2>
+      <p>MAIN 与 GAME 两个分支的更新记录。默认只展开最近两个版本，更早的版本可折叠查看。</p>
     </div>
 
-    <div class="log-item">
-      <div class="log-ver">v6.6.1<small>当前版本</small></div>
-      <div class="log-body">
-        <h4>体验优化与收尾</h4>
-        <ul>
-          <li>更好的serve，增加多种功能：聊天室，打包下载为zip格式，应急通道等等</li>
-          <li>编辑器全屏改造：改为全屏窗口，修正行号栏滚动同步与行高对齐。</li>
-          <li>清理历史包袱：去除所有异步测试代码、未使用的头文件与历史冗余代码。</li>
-        </ul>
+    <div class="log-filter" id="logFilter">
+      <button class="active" data-branch="all">全部</button>
+      <button data-branch="main">MAIN</button>
+      <button data-branch="game">GAME</button>
+    </div>
+
+    <!-- MAIN 分支 -->
+    <div class="log-group" data-branch="main">
+      <div class="log-group-title">
+        MAIN 版本
+        <span class="badge">终端主体</span>
       </div>
-    </div>
 
-    <div class="log-item">
-      <div class="log-ver">v6.6.0<small>历史版本</small></div>
-      <div class="log-body">
-        <h4>更加适应安卓9+环境</h4>
-        <ul>
-          <li>核心底层重构：彻底移除 PRoot 与内置 busybox</li>
-          <li>HTTP 服务器深度优化</li>
-          <li>新增自检系统与白名单动态分类</li>
-          <li>文件操作调整，执行真实删除，防止假删除</li>
-        </ul>
+      <div class="log-item">
+        <div class="log-ver">v6.6.1<small>当前版本</small></div>
+        <div class="log-body">
+          <h4>体验优化与收尾</h4>
+          <ul>
+            <li>更好的serve，增加多种功能：聊天室，打包下载为zip格式，应急通道等等</li>
+            <li>编辑器全屏改造：改为全屏窗口，修正行号栏滚动同步与行高对齐。</li>
+            <li>清理历史包袱：去除所有异步测试代码、未使用的头文件与历史冗余代码。</li>
+          </ul>
+        </div>
       </div>
-    </div>
 
-    <div class="log-item">
-      <div class="log-ver">v6.5.1<small>历史版本</small></div>
-      <div class="log-body">
-        <h4>修复应用适应安卓环境</h4>
-        <ul>
-          <li>HTTP 服务器大幅增强</li>
-          <li>文件操作安全强化</li>
-          <li>修复proot和busybox适应安卓问题</li>
-        </ul>
+      <div class="log-item">
+        <div class="log-ver">v6.6.0<small>历史版本</small></div>
+        <div class="log-body">
+          <h4>更加适应安卓9+环境</h4>
+          <ul>
+            <li>核心底层重构：彻底移除 PRoot 与内置 busybox</li>
+            <li>HTTP 服务器深度优化</li>
+            <li>新增自检系统与白名单动态分类</li>
+            <li>文件操作调整，执行真实删除，防止假删除</li>
+          </ul>
+        </div>
       </div>
+
+      <details class="log-more">
+        <summary>展开更早的 MAIN 版本（v6.5.1 及以前）</summary>
+
+        <div class="log-item">
+          <div class="log-ver">v6.5.1<small>历史版本</small></div>
+          <div class="log-body">
+            <h4>修复应用适应安卓环境</h4>
+            <ul>
+              <li>HTTP 服务器大幅增强</li>
+              <li>文件操作安全强化</li>
+              <li>修复proot和busybox适应安卓问题</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="log-item">
+          <div class="log-ver">v6.5.0<small>历史版本</small></div>
+          <div class="log-body">
+            <h4>修复HTTP服务器</h4>
+            <ul>
+              <li>HTTP 服务器用户系统/页面新增功能与美化</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="log-item">
+          <div class="log-ver">v6.4.0<small>历史版本</small></div>
+          <div class="log-body">
+            <h4>体验优化</h4>
+            <ul>
+              <li>Lua 5.4 脚本引擎支持</li>
+              <li>nano全屏编辑器，支持保存、查找、替换、Ctrl+S/F/H 快捷键、修改提示、关闭前保存确认</li>
+              <li>HTTP 服务器重写为完整文件管理器：支持浏览、下载、上传、新建文件夹、删除、目录导航，带响应式 Web 界面与请求体完整性等待</li>
+              <li>合并大量命令</li>
+              <li>移除游戏</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="log-item">
+          <div class="log-ver">v6.2.0(final)<small>历史版本</small></div>
+          <div class="log-body">
+            <h4>体验优化</h4>
+            <ul>
+              <li>增加通知栏</li>
+              <li>SSH 增强</li>
+              <li>高危命令清单扩充</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="log-item">
+          <div class="log-ver">v6.2.0(pro)<small>历史版本</small></div>
+          <div class="log-body">
+            <h4>增加ubuntu</h4>
+            <ul>
+              <li>Ubuntu 发行版支持</li>
+              <li>更改proot配置ubuntu</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="log-item">
+          <div class="log-ver">v6.2.0<small>历史版本</small></div>
+          <div class="log-body">
+            <h4>体验优化</h4>
+            <ul>
+              <li>log系统日志新增按日志级别着色</li>
+              <li>主界面新增状态栏，实时显示当前目录、磁盘占用与会话编号</li>
+              <li>增加root 检测与根目录查看</li>
+              <li>增加SSH 密钥工具</li>
+              <li>ls增强配色</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="log-item">
+          <div class="log-ver">v6.1.0<small>历史版本</small></div>
+          <div class="log-body">
+            <h4>增加proot和alpine</h4>
+            <ul>
+              <li>新增PRoot 容器环境支持</li>
+              <li>欢迎信息新增"辅助制作:DeepSeek Chat"署名</li>
+              <li>超时机制调整为不限时</li>
+              <li>新增MANAGE_EXTERNAL_STORAGE与媒体读取权限</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="log-item">
+          <div class="log-ver">v6.0.0<small>历史版本</small></div>
+          <div class="log-body">
+            <h4>体验稳定</h4>
+            <ul>
+              <li>help命令说明表精简</li>
+              <li>删除大量help命令说明条目，仅保留常用命令</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="log-item">
+          <div class="log-ver">v5.4.0(beta)<small>历史版本</small></div>
+          <div class="log-body">
+            <h4>新测试（此版本容易崩溃）</h4>
+            <ul>
+              <li>ssh命令进入交互会话，输入直发进程</li>
+              <li>高危命令确认机制需confirm二次确认</li>
+              <li>get-busybox增加 SHA256 校验、可执行性验证、失败自动清理</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="log-item">
+          <div class="log-ver">v5.2.0<small>历史版本</small></div>
+          <div class="log-body">
+            <h4>增加更多命令</h4>
+            <ul>
+              <li>全屏系统日志窗口，支持过滤、/命令 执行、与程序日志切换</li>
+              <li>help命令说明表扩充，覆盖新增的众多命令</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="log-item">
+          <div class="log-ver">v5.1.0<small>历史版本</small></div>
+          <div class="log-body">
+            <h4>增加busybox</h4>
+            <ul>
+              <li>cmen改为busybox指引</li>
+              <li>内置busybox二进制资源</li>
+              <li>支持help<命令名>查看单条命令的具体用法</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="log-item">
+          <div class="log-ver">v5.0.0<small>历史版本</small></div>
+          <div class="log-body">
+            <h4>体验优化</h4>
+            <ul>
+              <li>由QMainWindow+菜单栏改为纯QWidget终端界面</li>
+              <li>扫雷重写为纯文本终端玩法，移除独立 GUI 扫雷窗口</li>
+              <li>欢迎信息与版权标识更新</li>
+              <li>cmenu命令完整命令菜单一览</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="log-item">
+          <div class="log-ver">v4.0.0<small>历史版本</small></div>
+          <div class="log-body">
+            <h4>一切开始的地方</h4>
+            <ul>
+              <li>保留py版本的所有功能</li>
+            </ul>
+          </div>
+        </div>
+
+      </details>
     </div>
 
-    <div class="log-item">
-      <div class="log-ver">v6.5.0<small>历史版本</small></div>
-      <div class="log-body">
-        <h4>修复HTTP服务器</h4>
-        <ul>
-          <li>HTTP 服务器用户系统/页面新增功能与美化</li>
-        </ul>
+    <!-- GAME 分支 -->
+    <div class="log-group" data-branch="game">
+      <div class="log-group-title">
+        GAME 版本
+        <span class="badge">HTML 游戏启动器</span>
       </div>
-    </div>
 
-    <div class="log-item">
-      <div class="log-ver">v6.4.0<small>历史版本</small></div>
-      <div class="log-body">
-        <h4>体验优化</h4>
-        <ul>
-          <li>Lua 5.4 脚本引擎支持</li>
-          <li>nano全屏编辑器，支持保存、查找、替换、Ctrl+S/F/H 快捷键、修改提示、关闭前保存确认</li>
-          <li>HTTP 服务器重写为完整文件管理器：支持浏览、下载、上传、新建文件夹、删除、目录导航，带响应式 Web 界面与请求体完整性等待</li>
-          <li>合并大量命令</li>
-          <li>移除游戏</li>
-        </ul>
+      <div class="log-item">
+        <div class="log-ver">v1.4.0<small>当前版本</small></div>
+        <div class="log-body">
+          <h4>体验优化与稳定性收尾</h4>
+          <ul>
+            <li>修改部分游戏bug</li>
+          </ul>
+        </div>
       </div>
-    </div>
 
-    <div class="log-item">
-      <div class="log-ver">v6.2.0(final)<small>历史版本</small></div>
-      <div class="log-body">
-        <h4>体验优化</h4>
-        <ul>
-          <li>增加通知栏</li>
-          <li>SSH 增强</li>
-          <li>高危命令清单扩充</li>
-        </ul>
+      <div class="log-item">
+        <div class="log-ver">v1.2.0<small>历史版本</small></div>
+        <div class="log-body">
+          <h4>体验优化</h4>
+          <ul>
+            <li>新增 2 个 HTML 游戏</li>
+            <li>`guard-the-blue` 游戏即作者的获奖作品《守护蔚蓝》，获"深蓝百万里提升海洋素养数智创意传播大赛"赛道三·数智交互体验赛道初中组二等奖，此作品以unlicense开源</li>
+          </ul>
+        </div>
       </div>
+
+      <details class="log-more">
+        <summary>展开更早的 GAME 版本（v1.1.0 及以前）</summary>
+
+        <div class="log-item">
+          <div class="log-ver">v1.1.0<small>历史版本</small></div>
+          <div class="log-body">
+            <h4>体验优化</h4>
+            <ul>
+              <li>新增 10 个 HTML 游戏</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="log-item">
+          <div class="log-ver">v1.0.0<small>历史版本</small></div>
+          <div class="log-body">
+            <h4>game分支</h4>
+            <ul>
+              <li>从 v6.5.0 剥离出来的「HTML 游戏启动器」精简版</li>
+              <li>只保留两个命令模块，纯终端趣味命令</li>
+            </ul>
+          </div>
+        </div>
+
+      </details>
     </div>
 
-    <div class="log-item">
-      <div class="log-ver">v6.2.0(pro)<small>历史版本</small></div>
-      <div class="log-body">
-        <h4>增加ubuntu</h4>
-        <ul>
-          <li>Ubuntu 发行版支持</li>
-          <li>更改proot配置ubuntu</li>
-        </ul>
-      </div>
-    </div>
-
-    <div class="log-item">
-      <div class="log-ver">v6.2.0<small>历史版本</small></div>
-      <div class="log-body">
-        <h4>体验优化</h4>
-        <ul>
-          <li>log系统日志新增按日志级别着色</li>
-          <li>主界面新增状态栏，实时显示当前目录、磁盘占用与会话编号</li>
-          <li>增加root 检测与根目录查看</li>
-          <li>增加SSH 密钥工具</li>
-          <li>ls增强配色</li>
-        </ul>
-      </div>
-    </div>
-
-    <div class="log-item">
-      <div class="log-ver">v6.1.0<small>历史版本</small></div>
-      <div class="log-body">
-        <h4>增加proot和alpine</h4>
-        <ul>
-          <li>新增PRoot 容器环境支持</li>
-          <li>欢迎信息新增"辅助制作:DeepSeek Chat"署名</li>
-          <li>超时机制调整为不限时</li>
-          <li>新增MANAGE_EXTERNAL_STORAGE与媒体读取权限</li>
-        </ul>
-      </div>
-    </div>
-
-    <div class="log-item">
-      <div class="log-ver">v6.0.0<small>历史版本</small></div>
-      <div class="log-body">
-        <h4>体验稳定</h4>
-        <ul>
-          <li>help命令说明表精简</li>
-          <li>删除大量help命令说明条目，仅保留常用命令</li>
-        </ul>
-      </div>
-    </div>
-
-    <div class="log-item">
-      <div class="log-ver">v5.4.0(beta)<small>历史版本</small></div>
-      <div class="log-body">
-        <h4>新测试（此版本容易崩溃）</h4>
-        <ul>
-          <li>ssh命令进入交互会话，输入直发进程</li>
-          <li>高危命令确认机制需confirm二次确认</li>
-          <li>get-busybox增加 SHA256 校验、可执行性验证、失败自动清理</li>
-        </ul>
-      </div>
-    </div>
-
-    <div class="log-item">
-      <div class="log-ver">v5.2.0<small>历史版本</small></div>
-      <div class="log-body">
-        <h4>增加更多命令</h4>
-        <ul>
-          <li>全屏系统日志窗口，支持过滤、/命令 执行、与程序日志切换</li>
-          <li>help命令说明表扩充，覆盖新增的众多命令</li>
-        </ul>
-      </div>
-    </div>
-
-    <div class="log-item">
-      <div class="log-ver">v5.1.0<small>历史版本</small></div>
-      <div class="log-body">
-        <h4>增加busybox</h4>
-        <ul>
-          <li>cmen改为busybox指引</li>
-          <li>内置busybox二进制资源</li>
-          <li>支持help<命令名>查看单条命令的具体用法</li>
-        </ul>
-      </div>
-    </div>
-
-    <div class="log-item">
-      <div class="log-ver">v5.0.0<small>历史版本</small></div>
-      <div class="log-body">
-        <h4>体验优化</h4>
-        <ul>
-          <li>由QMainWindow+菜单栏改为纯QWidget终端界面</li>
-          <li>扫雷重写为纯文本终端玩法，移除独立 GUI 扫雷窗口</li>
-          <li>欢迎信息与版权标识更新</li>
-          <li>cmenu命令完整命令菜单一览</li>
-        </ul>
-      </div>
-    </div>
-
-    <div class="log-item">
-      <div class="log-ver">v4.0.0<small>历史版本</small></div>
-      <div class="log-body">
-        <h4>一切开始的地方</h4>
-        <ul>
-          <li>保留py版本的所有功能</li>
-        </ul>
-      </div>
-    </div>
-
-    <h2 style="font-size:22px;margin:40px 0 8px;">GAME版本</h2>
-
-    <div class="log-item">
-      <div class="log-ver">v1.4.0<small>当前版本</small></div>
-      <div class="log-body">
-        <h4>体验优化与稳定性收尾</h4>
-        <ul>
-          <li>修改部分游戏bug</li>
-        </ul>
-      </div>
-    </div>
-
-    <div class="log-item">
-      <div class="log-ver">v1.2.0<small>历史版本</small></div>
-      <div class="log-body">
-        <h4>体验优化</h4>
-        <ul>
-          <li>新增 2 个 HTML 游戏</li>
-          <li>`guard-the-blue` 游戏即作者作者的获奖作品《守护蔚蓝》，获"深蓝百万里提升海洋素养数智创意传播大赛"赛道三·数智交互体验赛道初中组二等奖，此作品以unlicense开源</li>
-        </ul>
-      </div>
-    </div>
-
-    <div class="log-item">
-      <div class="log-ver">v1.1.0<small>历史版本</small></div>
-      <div class="log-body">
-        <h4>体验优化</h4>
-        <ul>
-          <li>新增 10 个 HTML 游戏</li>
-        </ul>
-      </div>
-    </div>
-
-    <div class="log-item">
-      <div class="log-ver">v1.0.0<small>历史版本</small></div>
-      <div class="log-body">
-        <h4>game分支</h4>
-        <ul>
-          <li>从 v6.5.0 剥离出来的「HTML 游戏启动器」精简版</li>
-          <li>只保留两个命令模块，纯终端趣味命令</li>
-        </ul>
-      </div>
-    </div>
     <div class="note info">
-      <strong>注意：只是简略版本的更新日志，完整更新日志位于<a href="https://github.com/rivers-sheng/Termail-zd/tree/main/termail-changelog" target="_blank" rel="noopener">GitHub</a></strong>
+      <strong>注意：</strong>这里只是简略版本的更新日志，完整更新日志位于
+      <a href="https://github.com/rivers-sheng/Termail-zd/tree/main/termail-changelog" target="_blank" rel="noopener">GitHub</a>
     </div>
   </div>
 </section>
@@ -965,52 +1141,52 @@
     </div>
 
     <!-- 卡片 1：当前版本 -->
-    <div class="download-card">
+    <div class="download-card primary">
       <h3>开始使用 Termail-zd</h3>
       <p>开源项目，已归档/准备发布。APK 约 10.8 MB，基于 Qt 6.5.0 + C++17 + NDK 25.1 构建。</p>
       <div class="download-actions">
         <a class="btn btn-primary" href="https://github.com/rivers-sheng/Termail-zd" id="linkSourceBottom" target="_blank" rel="noopener">
           ⚡ 查看源码
         </a>
-        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_final_patch5.v6.6.1.apk" id="linkDownloadMainBottom" target="_blank" rel="noopener">
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_final_patch5.v6.6.1.apk" id="linkDownloadMainBottom" target="_blank" rel="noopener" data-ver="MAIN 6.6.1">
           ⬇ 下载 MAIN 6.6.1 APK
         </a>
-        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(GAME)/TermailGames_v1.4.apk" id="linkDownloadGameBottom" target="_blank" rel="noopener">
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(GAME)/TermailGames_v1.4.apk" id="linkDownloadGameBottom" target="_blank" rel="noopener" data-ver="GAME 1.4.0">
           ⬇ 下载 GAME 1.4.0 APK
         </a>
       </div>
     </div>
 
     <!-- 卡片 2：历史 MAIN 版本 -->
-    <div class="download-card">
-      <h4>历史版本 · MAIN（可能包含 bug）</h4>
+    <div class="download-card history">
+      <h4>历史版本 · MAIN <span class="tag-sm">可能包含 bug</span></h4>
       <div class="version-grid">
-        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_final_patch5.v6.6.1.apk" target="_blank" rel="noopener">MAIN 6.6.1</a>
-        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_final_patch4.v6.6.0.apk" target="_blank" rel="noopener">MAIN 6.6.0</a>
-        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_final_patch3.v6.5.1.apk" target="_blank" rel="noopener">MAIN 6.5.1</a>
-        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_final_patch2.v6.5.0.apk" target="_blank" rel="noopener">MAIN 6.5.0</a>
-        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_final_patch1.v6.4.0.apk" target="_blank" rel="noopener">MAIN 6.4.0</a>
-        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_final.v6.2.0.apk" target="_blank" rel="noopener">MAIN 6.2.0 (final)</a>
-        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_v6.2_Pro.apk" target="_blank" rel="noopener">MAIN 6.2.0 (pro)</a>
-        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_6.2.apk" target="_blank" rel="noopener">MAIN 6.2.0</a>
-        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_6.1.apk" target="_blank" rel="noopener">MAIN 6.1.0</a>
-        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_v6.0.apk" target="_blank" rel="noopener">MAIN 6.0.0</a>
-        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_5.4beta.apk" target="_blank" rel="noopener">MAIN 5.4.0 (beta)</a>
-        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_v5.2.apk" target="_blank" rel="noopener">MAIN 5.2.0</a>
-        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_v5.1.apk" target="_blank" rel="noopener">MAIN 5.1.0</a>
-        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_v5.0.apk" target="_blank" rel="noopener">MAIN 5.0.0</a>
-        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_v4.0.apk" target="_blank" rel="noopener">MAIN 4.0.0</a>
+        <a class="btn btn-ghost current" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_final_patch5.v6.6.1.apk" target="_blank" rel="noopener" data-ver="MAIN 6.6.1">MAIN 6.6.1</a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_final_patch4.v6.6.0.apk" target="_blank" rel="noopener" data-ver="MAIN 6.6.0">MAIN 6.6.0</a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_final_patch3.v6.5.1.apk" target="_blank" rel="noopener" data-ver="MAIN 6.5.1">MAIN 6.5.1</a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_final_patch2.v6.5.0.apk" target="_blank" rel="noopener" data-ver="MAIN 6.5.0">MAIN 6.5.0</a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_final_patch1.v6.4.0.apk" target="_blank" rel="noopener" data-ver="MAIN 6.4.0">MAIN 6.4.0</a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_final.v6.2.0.apk" target="_blank" rel="noopener" data-ver="MAIN 6.2.0 final">MAIN 6.2.0 (final)</a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_v6.2_Pro.apk" target="_blank" rel="noopener" data-ver="MAIN 6.2.0 pro">MAIN 6.2.0 (pro)</a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_6.2.apk" target="_blank" rel="noopener" data-ver="MAIN 6.2.0">MAIN 6.2.0</a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_6.1.apk" target="_blank" rel="noopener" data-ver="MAIN 6.1.0">MAIN 6.1.0</a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_v6.0.apk" target="_blank" rel="noopener" data-ver="MAIN 6.0.0">MAIN 6.0.0</a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_5.4beta.apk" target="_blank" rel="noopener" data-ver="MAIN 5.4.0 beta">MAIN 5.4.0 (beta)</a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_v5.2.apk" target="_blank" rel="noopener" data-ver="MAIN 5.2.0">MAIN 5.2.0</a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_v5.1.apk" target="_blank" rel="noopener" data-ver="MAIN 5.1.0">MAIN 5.1.0</a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_v5.0.apk" target="_blank" rel="noopener" data-ver="MAIN 5.0.0">MAIN 5.0.0</a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(MAIN)/Termail_v4.0.apk" target="_blank" rel="noopener" data-ver="MAIN 4.0.0">MAIN 4.0.0</a>
       </div>
     </div>
 
     <!-- 卡片 3：历史 GAME 版本 -->
-    <div class="download-card">
-      <h4>历史版本 · GAME </h4>
+    <div class="download-card history">
+      <h4>历史版本 · GAME <span class="tag-sm">HTML 游戏启动器</span></h4>
       <div class="version-grid">
-        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(GAME)/TermailGames_v1.4.apk" target="_blank" rel="noopener">GAME 1.4.0</a>
-        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(GAME)/TermailGames_v1.2.apk" target="_blank" rel="noopener">GAME 1.2.0</a>
-        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(GAME)/TermailGames_v1.1.apk" target="_blank" rel="noopener">GAME 1.1.0</a>
-        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(GAME)/TermailGames_v1.0.apk" target="_blank" rel="noopener">GAME 1.0.0</a>
+        <a class="btn btn-ghost current" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(GAME)/TermailGames_v1.4.apk" target="_blank" rel="noopener" data-ver="GAME 1.4.0">GAME 1.4.0</a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(GAME)/TermailGames_v1.2.apk" target="_blank" rel="noopener" data-ver="GAME 1.2.0">GAME 1.2.0</a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(GAME)/TermailGames_v1.1.apk" target="_blank" rel="noopener" data-ver="GAME 1.1.0">GAME 1.1.0</a>
+        <a class="btn btn-ghost" href="https://github.com/rivers-sheng/Termail-zd/releases/download/Termail(GAME)/TermailGames_v1.0.apk" target="_blank" rel="noopener" data-ver="GAME 1.0.0">GAME 1.0.0</a>
       </div>
     </div>
 
@@ -1030,24 +1206,31 @@
 <div id="toast"></div>
 
 <script>
+/* ---------- 主题切换 ---------- */
 (function(){
   const root = document.documentElement;
   const btn = document.getElementById('themeBtn');
   const saved = localStorage.getItem('termail-theme');
   if (saved) root.setAttribute('data-theme', saved);
-  btn.addEventListener('click', () => {
+  const sync = () => {
+    btn.textContent = root.getAttribute('data-theme') === 'dark' ? '◐' : '☀';
+  };
+  const toggle = () => {
     const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
     root.setAttribute('data-theme', next);
     localStorage.setItem('termail-theme', next);
-    btn.textContent = next === 'dark' ? '◐' : '☀';
-  });
-  btn.textContent = root.getAttribute('data-theme') === 'dark' ? '◐' : '☀';
+    sync();
+  };
+  btn.addEventListener('click', toggle);
+  sync();
+  window.__toggleTheme = toggle;
 })();
 
 /* ---------- 滚动进度 & 回到顶部 & 导航高亮 ---------- */
 (function(){
   const bar = document.getElementById('progress');
   const toTop = document.getElementById('toTop');
+  const nav = document.getElementById('nav');
   const links = [...document.querySelectorAll('.nav-links a')];
   const sections = links.map(a => document.querySelector(a.getAttribute('href'))).filter(Boolean);
 
@@ -1056,6 +1239,7 @@
     const max = h.scrollHeight - h.clientHeight;
     bar.style.width = max > 0 ? (h.scrollTop / max * 100) + '%' : '0%';
     toTop.classList.toggle('show', h.scrollTop > 400);
+    nav.classList.toggle('scrolled', h.scrollTop > 10);
 
     let current = null;
     for (const s of sections){
@@ -1142,16 +1326,23 @@ const COMMANDS = [
   const tabs = [...document.querySelectorAll('.tab')];
   let activeCat = 'all';
 
-  function render(){
+  function escapeHtml(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function getFiltered(){
     const q = search.value.trim().toLowerCase();
-    const list = COMMANDS.filter(c => {
+    return COMMANDS.filter(c => {
       const catOk = activeCat === 'all' || c.cat === activeCat;
       const qOk = !q || c.name.toLowerCase().includes(q) ||
                   c.desc.toLowerCase().includes(q) ||
                   c.usage.toLowerCase().includes(q);
       return catOk && qOk;
     });
+  }
 
+  function render(){
+    const list = getFiltered();
     countEl.textContent = `显示 ${list.length} / ${COMMANDS.length}`;
 
     if (list.length === 0){
@@ -1160,10 +1351,10 @@ const COMMANDS = [
     }
 
     grid.innerHTML = list.map(c => `
-      <div class="cmd-item">
+      <div class="cmd-item" data-name="${c.name}">
         <div class="name">
           <span>${c.name}</span>
-          <span class="copy" data-cmd="${c.name}">复制</span>
+          <span class="copy" data-cmd="${c.name}" data-usage="${escapeHtml(c.usage)}">复制</span>
         </div>
         <div class="desc">${c.desc}</div>
         <div class="usage">${escapeHtml(c.usage)}</div>
@@ -1173,13 +1364,9 @@ const COMMANDS = [
     grid.querySelectorAll('.copy').forEach(btn => {
       btn.addEventListener('click', e => {
         e.stopPropagation();
-        copyText(btn.dataset.cmd);
+        copyText(`${btn.dataset.cmd} — ${btn.dataset.usage}`);
       });
     });
-  }
-
-  function escapeHtml(s){
-    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
   search.addEventListener('input', render);
@@ -1190,7 +1377,59 @@ const COMMANDS = [
     render();
   }));
 
+  /* 随机命令 */
+  document.getElementById('randomCmd').addEventListener('click', () => {
+    const list = getFiltered();
+    if (!list.length) { showToast('当前筛选下没有命令'); return; }
+    const pick = list[Math.floor(Math.random() * list.length)];
+    // 确保该项在当前视图里可见
+    let item = grid.querySelector(`.cmd-item[data-name="${pick.name}"]`);
+    if (!item){
+      // 若被筛选掉了，重置筛选
+      search.value = '';
+      tabs.forEach(x => x.classList.remove('active'));
+      document.querySelector('.tab[data-cat="all"]').classList.add('active');
+      activeCat = 'all';
+      render();
+      item = grid.querySelector(`.cmd-item[data-name="${pick.name}"]`);
+    }
+    if (item){
+      item.scrollIntoView({behavior:'smooth', block:'center'});
+      item.classList.remove('flash');
+      void item.offsetWidth;
+      item.classList.add('flash');
+      setTimeout(() => item.classList.remove('flash'), 1200);
+      showToast('随机命令: ' + pick.name);
+    }
+  });
+
   render();
+})();
+
+/* ---------- 日志分支筛选 ---------- */
+(function(){
+  const filter = document.getElementById('logFilter');
+  const btns = [...filter.querySelectorAll('button')];
+  const groups = [...document.querySelectorAll('.log-group')];
+
+  btns.forEach(b => b.addEventListener('click', () => {
+    btns.forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    const branch = b.dataset.branch;
+    groups.forEach(g => {
+      g.dataset.hidden = (branch !== 'all' && g.dataset.branch !== branch) ? 'true' : 'false';
+    });
+  }));
+})();
+
+/* ---------- 下载点击提示 ---------- */
+(function(){
+  document.querySelectorAll('a[data-ver]').forEach(a => {
+    a.addEventListener('click', () => {
+      if (a.getAttribute('href') === '#') return;
+      showToast('开始下载 ' + a.dataset.ver);
+    });
+  });
 })();
 
 /* ---------- 复制 & Toast ---------- */
@@ -1220,6 +1459,31 @@ function showToast(msg){
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
 }
+
+/* ---------- 键盘快捷键 ---------- */
+(function(){
+  const search = document.getElementById('cmdSearch');
+  document.addEventListener('keydown', e => {
+    const tag = (e.target.tagName || '').toLowerCase();
+    const typing = tag === 'input' || tag === 'textarea' || e.target.isContentEditable;
+
+    if (e.key === '/' && !typing){
+      e.preventDefault();
+      search.focus();
+      search.scrollIntoView({behavior:'smooth', block:'center'});
+      return;
+    }
+    if (e.key === 'Escape' && typing){
+      search.value = '';
+      search.dispatchEvent(new Event('input'));
+      search.blur();
+      return;
+    }
+    if ((e.key === 't' || e.key === 'T') && !typing && !e.ctrlKey && !e.metaKey && !e.altKey){
+      window.__toggleTheme && window.__toggleTheme();
+    }
+  });
+})();
 </script>
 
 </body>
